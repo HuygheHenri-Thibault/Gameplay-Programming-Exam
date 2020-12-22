@@ -11,10 +11,10 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 
 	//Bit information about the plugin
 	//Please fill this in!!
-	info.BotName = "BotNameTEST";
-	info.Student_FirstName = "Foo";
-	info.Student_LastName = "Bar";
-	info.Student_Class = "2DAEx";
+	info.BotName = "BestBot";
+	info.Student_FirstName = "Henri-Thibault";
+	info.Student_LastName = "Huyghe";
+	info.Student_Class = "2DAE01";
 }
 
 //Called only once
@@ -29,6 +29,7 @@ void Plugin::DllShutdown()
 	//Called wheb the plugin gets unloaded
 }
 
+#pragma region Debug
 //Called only once, during initialization
 void Plugin::InitGameDebugParams(GameDebugParams& params)
 {
@@ -83,6 +84,14 @@ void Plugin::Update(float dt)
 	}
 }
 
+//This function should only be used for rendering debug elements
+void Plugin::Render(float dt) const
+{
+	//This Render function should only contain calls to Interface->Draw_... functions
+	m_pInterface->Draw_SolidCircle(m_Target, .7f, { 0,0 }, { 1, 0, 0 });
+}
+#pragma endregion
+
 //Update
 //This function calculates the new SteeringOutput, called once per frame
 SteeringPlugin_Output Plugin::UpdateSteering(float dt)
@@ -104,6 +113,13 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 			PurgeZoneInfo zoneInfo;
 			m_pInterface->PurgeZone_GetInfo(e, zoneInfo);
 			std::cout << "Purge Zone in FOV:" << e.Location.x << ", "<< e.Location.y <<  " ---EntityHash: " << e.EntityHash << "---Radius: "<< zoneInfo.Radius << std::endl;
+		}
+
+		if (e.Type == eEntityType::ENEMY)
+		{
+			EnemyInfo enemyInfo;
+			m_pInterface->Enemy_GetInfo(e, enemyInfo);
+			std::cout << "Enemy in FOV" << std::endl;
 		}
 	}
 	
@@ -163,13 +179,6 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 	return steering;
 }
 
-//This function should only be used for rendering debug elements
-void Plugin::Render(float dt) const
-{
-	//This Render function should only contain calls to Interface->Draw_... functions
-	m_pInterface->Draw_SolidCircle(m_Target, .7f, { 0,0 }, { 1, 0, 0 });
-}
-
 vector<HouseInfo> Plugin::GetHousesInFOV() const
 {
 	vector<HouseInfo> vHousesInFOV = {};
@@ -207,3 +216,4 @@ vector<EntityInfo> Plugin::GetEntitiesInFOV() const
 
 	return vEntitiesInFOV;
 }
+
