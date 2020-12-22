@@ -1,3 +1,7 @@
+# Own additions
+
+_DEMO_DEBUG/
+_DEMO_RELEASE/
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudio,c++
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudio,c++
