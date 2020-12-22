@@ -398,3 +398,5 @@ MigrationBackup/
 # Own additions
 _DEMO_DEBUG/*
 _DEMO_RELEASE/*
+_DEMO_DEBUG/imgui.ini
+_DEMO_DEBUG/GPP_Plugin_d.exp
