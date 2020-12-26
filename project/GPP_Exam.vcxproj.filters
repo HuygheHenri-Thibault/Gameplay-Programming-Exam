@@ -3,9 +3,32 @@
   <ItemGroup>
     <ClCompile Include="Plugin.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="EBehaviorTree.cpp">
+      <Filter>BehaviorTree</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Plugin.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="Behaviors.h">
+      <Filter>BehaviorTree</Filter>
+    </ClInclude>
+    <ClInclude Include="EBehaviorTree.h">
+      <Filter>BehaviorTree</Filter>
+    </ClInclude>
+    <ClInclude Include="EBlackboard.h">
+      <Filter>Blackboard</Filter>
+    </ClInclude>
+    <ClInclude Include="EDecisionMaking.h">
+      <Filter>BehaviorTree</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="BehaviorTree">
+      <UniqueIdentifier>{b1b5f917-2e0a-4bfb-aaba-b3652fb35c2a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Blackboard">
+      <UniqueIdentifier>{1b9e8ca6-ceb9-431d-8fe1-f6b932ddc81f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>
