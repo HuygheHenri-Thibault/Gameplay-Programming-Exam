@@ -186,11 +186,19 @@
     <ClInclude Include="EBehaviorTree.h" />
     <ClInclude Include="EBlackboard.h" />
     <ClInclude Include="EDecisionMaking.h" />
+    <ClInclude Include="EliteMath\EMat22.h" />
+    <ClInclude Include="EliteMath\EMath.h" />
+    <ClInclude Include="EliteMath\EMathUtilities.h" />
+    <ClInclude Include="EliteMath\EMatrix2x3.h" />
+    <ClInclude Include="EliteMath\EVector2.h" />
+    <ClInclude Include="EliteMath\EVector3.h" />
     <ClInclude Include="Plugin.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="Stucts.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EBehaviorTree.cpp" />
+    <ClCompile Include="EliteMath\EMatrix2x3.cpp" />
     <ClCompile Include="Plugin.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

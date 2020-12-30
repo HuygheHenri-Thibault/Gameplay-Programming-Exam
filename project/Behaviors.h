@@ -10,133 +10,60 @@
 //-----------------------------------------------------------------
 #include "EliteMath/EMath.h"
 #include "EBehaviorTree.h"
-//#include "../Shared/Agario/AgarioAgent.h"
-//#include "../Shared/Agario/AgarioFood.h"
-//#include "../App_Steering/SteeringBehaviors.h"
+#include "Stucts.h"
 using namespace Elite;
 //-----------------------------------------------------------------
 // Behaviors
 //-----------------------------------------------------------------
 
-//bool IsCloseToFood(Elite::Blackboard* pBlackboard)
-//{
-//	AgarioAgent* pAgent = nullptr;
-//	std::vector<AgarioFood*>* foodVec = nullptr;
-//
-//	auto dataAvailable = pBlackboard->GetData("Agent", pAgent) &&
-//		pBlackboard->GetData("FoodVec", foodVec);
-//
-//	if (!pAgent || !foodVec || !dataAvailable)
-//		return false;
-//
-//	const float closeToRange = 20.f;
-//	auto foodItr = std::find_if(foodVec->begin(), foodVec->end(), 
-//		[pAgent, closeToRange](AgarioFood* food)
-//		{
-//			//return true if close to agent
-//			return DistanceSquared(pAgent->GetPosition(), food->GetPosition()) < pow(closeToRange, 2);
-//		}
-//	);
-//
-//	if (foodItr != foodVec->end())
-//	{
-//		pBlackboard->ChangeData("Target", (*foodItr)->GetPosition());
-//		return true;
-//	}
-//	
-//	return false;
-//}
-//
-//bool IsThereAnyFood(Elite::Blackboard* pBlackboard)
-//{
-//	AgarioAgent* pAgent = nullptr;
-//	std::vector<AgarioFood*>* foodVec = nullptr;
-//
-//	auto dataAvailable = pBlackboard->GetData("Agent", pAgent) &&
-//		pBlackboard->GetData("FoodVec", foodVec);
-//
-//	if (!pAgent || !foodVec || !dataAvailable)
-//		return false;
-//
-//	float closestFoodSquaredDistance = FLT_MAX;
-//	AgarioFood* closestFood = nullptr;
-//	for (AgarioFood* food : (*foodVec))
-//	{
-//		if (DistanceSquared(pAgent->GetPosition(), food->GetPosition()) < closestFoodSquaredDistance)
-//		{
-//			closestFood = food;
-//		}
-//	}
-//	if (closestFood != nullptr)
-//	{
-//		pBlackboard->ChangeData("Target", closestFood->GetPosition());
-//		return true;
-//	}
-//	
-//	return false;
-//}
-//
-//bool IsCloseToPrey(Elite::Blackboard* pBlackboard)
-//{
-//	AgarioAgent* pAgent = nullptr;
-//	std::vector<AgarioAgent*>* enemyVec = nullptr;
-//
-//	auto dataAvailable = pBlackboard->GetData("Agent", pAgent) &&
-//		pBlackboard->GetData("AgentsVec", enemyVec);
-//
-//	if (!pAgent || !enemyVec || !dataAvailable)
-//		return false;
-//
-//	const float closeToRange = 30.f;
-//	const float radiusAdjust = 5.f;
-//	auto enemyItr = std::find_if(enemyVec->begin(), enemyVec->end(),
-//		[pAgent, closeToRange, radiusAdjust](AgarioAgent* enemy)
-//		{
-//			//return true if close to agent
-//			return DistanceSquared(pAgent->GetPosition(), enemy->GetPosition()) < pow(closeToRange, 2)
-//				&& pAgent->GetRadius() > enemy->GetRadius() + radiusAdjust;
-//		}
-//	);
-//
-//	if (enemyItr != enemyVec->end())
-//	{
-//		pBlackboard->ChangeData("Target", (*enemyItr)->GetPosition());
-//		return true;
-//	}
-//
-//	return false;
-//}
-//
-//bool IsDangerousEnemyClose(Elite::Blackboard* pBlackboard)
-//{
-//	AgarioAgent* pAgent = nullptr;
-//	std::vector<AgarioAgent*>* enemyVec = nullptr;
-//
-//	auto dataAvailable = pBlackboard->GetData("Agent", pAgent) &&
-//		pBlackboard->GetData("AgentsVec", enemyVec);
-//
-//	if (!pAgent || !enemyVec || !dataAvailable)
-//		return false;
-//
-//	const float closeToRange = pAgent->GetRadius() + 20.f;
-//	auto enemyItr = std::find_if(enemyVec->begin(), enemyVec->end(),
-//		[pAgent, closeToRange](AgarioAgent* enemy)
-//		{
-//			//return true if close to agent
-//			return DistanceSquared(pAgent->GetPosition(), enemy->GetPosition()) < pow(closeToRange, 2)
-//				&& pAgent->GetRadius() < enemy->GetRadius();
-//		}
-//	);
-//
-//	if (enemyItr != enemyVec->end())
-//	{
-//		pBlackboard->ChangeData("FleeTarget", (*enemyItr)->GetPosition());
-//		return true;
-//	}
-//
-//	return false;
-//}
-//
+BehaviorState ExpandingSquareSearch(Elite::Blackboard* pBlackboard)
+{	
+	const float squaredSearchDistanceMargin = 0.1f;
+	ExpandingSearchData searchData;
+	AgentInfo agentInfo;
+
+	bool dataAvailable = pBlackboard->GetData("ExpandingSquareSearchData", searchData)
+		&& pBlackboard->GetData("AgentInfo", agentInfo);
+
+	if (!dataAvailable)
+	{
+		return Failure;
+	}
+
+	if (DistanceSquared(searchData.lastSearchPosition, agentInfo.Position) < squaredSearchDistanceMargin)
+	{
+		float distanceToTravel = searchData.distance * (1 + searchData.step / 2);
+		Elite::Vector2 newTarget = searchData.lastSearchPosition;
+
+		switch (searchData.step % 4)
+		{
+		case 0:
+			// go left
+			newTarget.x -= distanceToTravel;
+			break;
+		case 1:
+			// go up
+			newTarget.y += distanceToTravel;
+			break;
+		case 2:
+			// go right
+			newTarget.x += distanceToTravel;
+			break;
+		case 3:
+			// go down
+			newTarget.y -= distanceToTravel;
+			break;
+		}
+
+		searchData.lastSearchPosition = newTarget;
+		searchData.step++;
+		pBlackboard->ChangeData("ExpandingSquareSearchData", searchData);
+	}
+
+	pBlackboard->ChangeData("Target", searchData.lastSearchPosition);
+	return Success;
+}
+
 //BehaviorState ChangeToWander(Elite::Blackboard* pBlackboard)
 //{
 //	AgarioAgent* pAgent = nullptr;

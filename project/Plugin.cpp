@@ -15,6 +15,22 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 	info.Student_FirstName = "Henri-Thibault";
 	info.Student_LastName = "Huyghe";
 	info.Student_Class = "2DAE01";
+
+
+	m_pBlackboard = new Blackboard();
+	m_pBlackboard->AddData("Target", Elite::Vector2{0,0});
+	m_pBlackboard->AddData("WorldInfo", m_pInterface->World_GetInfo());
+	m_pBlackboard->AddData("AgentInfo", m_pInterface->Agent_GetInfo());
+	m_pBlackboard->AddData("ExpandingSquareSearchData", ExpandingSearchData{ 20.f, 0, {0,0} });
+
+	m_pBehaviorTree = new BehaviorTree(m_pBlackboard,
+		new BehaviorSelector(
+			{
+				// TODO Add here
+				new BehaviorAction(ExpandingSquareSearch)
+			}
+		)
+	);
 }
 
 //Called only once
@@ -35,7 +51,7 @@ void Plugin::InitGameDebugParams(GameDebugParams& params)
 {
 	params.AutoFollowCam = true; //Automatically follow the AI? (Default = true)
 	params.RenderUI = true; //Render the IMGUI Panel? (Default = true)
-	params.SpawnEnemies = true; //Do you want to spawn enemies? (Default = true)
+	params.SpawnEnemies = false; //Do you want to spawn enemies? (Default = true)
 	params.EnemyCount = 20; //How many enemies? (Default = 20)
 	params.GodMode = false; //GodMode > You can't die, can be usefull to inspect certain behaviours (Default = false)
 	params.AutoGrabClosestItem = true; //A call to Item_Grab(...) returns the closest item that can be grabbed. (EntityInfo argument is ignored)
@@ -98,13 +114,20 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 {
 	auto steering = SteeringPlugin_Output();
 
+
 	//Use the Interface (IAssignmentInterface) to 'interface' with the AI_Framework
 	auto agentInfo = m_pInterface->Agent_GetInfo();
+	m_pBlackboard->ChangeData("AgentInfo", agentInfo);
 
 	auto nextTargetPos = m_Target; //To start you can use the mouse position as guidance
 
 	auto vHousesInFOV = GetHousesInFOV();//uses m_pInterface->Fov_GetHouseByIndex(...)
 	auto vEntitiesInFOV = GetEntitiesInFOV(); //uses m_pInterface->Fov_GetEntityByIndex(...)
+
+
+	m_pBehaviorTree->Update(dt);
+	m_pBlackboard->GetData("Target", nextTargetPos);
+	nextTargetPos = m_pInterface->NavMesh_GetClosestPathPoint(nextTargetPos);
 
 	for (auto& e : vEntitiesInFOV)
 	{

@@ -2,6 +2,13 @@
 #include "IExamPlugin.h"
 #include "Exam_HelperStructs.h"
 
+using namespace Elite;
+// Own Includes
+#include "EBehaviorTree.h"
+#include "EBlackboard.h"
+#include "Stucts.h"
+#include "Behaviors.h"
+
 class IBaseInterface;
 class IExamInterface;
 
@@ -33,6 +40,11 @@ private:
 	bool m_UseItem = false; //Demo purpose
 	bool m_RemoveItem = false; //Demo purpose
 	float m_AngSpeed = 0.f; //Demo purpose
+
+
+	// Own Additions
+	Blackboard* m_pBlackboard = nullptr;
+	BehaviorTree* m_pBehaviorTree = nullptr;
 };
 
 //ENTRY

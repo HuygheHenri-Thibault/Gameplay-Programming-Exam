@@ -6,6 +6,9 @@
     <ClCompile Include="EBehaviorTree.cpp">
       <Filter>BehaviorTree</Filter>
     </ClCompile>
+    <ClCompile Include="EliteMath\EMatrix2x3.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Plugin.h" />
@@ -22,6 +25,27 @@
     <ClInclude Include="EDecisionMaking.h">
       <Filter>BehaviorTree</Filter>
     </ClInclude>
+    <ClInclude Include="EliteMath\EMat22.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="EliteMath\EMath.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="EliteMath\EMathUtilities.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="EliteMath\EMatrix2x3.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="EliteMath\EVector2.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="EliteMath\EVector3.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Stucts.h">
+      <Filter>Structs</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="BehaviorTree">
@@ -29,6 +53,12 @@
     </Filter>
     <Filter Include="Blackboard">
       <UniqueIdentifier>{1b9e8ca6-ceb9-431d-8fe1-f6b932ddc81f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Math">
+      <UniqueIdentifier>{c2995d6a-0789-45a1-b4cb-6c923368d82f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Structs">
+      <UniqueIdentifier>{674ee051-3191-4719-abe8-80bc96385c4c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
