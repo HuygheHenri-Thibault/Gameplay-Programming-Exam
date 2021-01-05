@@ -21,14 +21,53 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 	m_pBlackboard->AddData("PluginInterface", m_pInterface);
 	m_pBlackboard->AddData("WorldInfo", m_pInterface->World_GetInfo());
 	m_pBlackboard->AddData("AgentInfo", m_pInterface->Agent_GetInfo());
-	m_pBlackboard->AddData("ExpandingSquareSearchData", ExpandingSearchData{ 20.f, 0, {0,0} });
+
+	// Exploring & Houses
+	m_pBlackboard->AddData("ExpandingSquareSearchData", ExpandingSearchData{ 25.f, 0, {0,0} });
 	m_pBlackboard->AddData("DiscoveredHouses", &m_DiscoveredHouses);
 	m_pBlackboard->AddData("IsNewHouseDiscovered", false);
+	m_pBlackboard->AddData("IsGoingToHouse", false);
+	m_pBlackboard->AddData("HouseTarget", HouseInfo{});
+
+	// Entities
+	m_pBlackboard->AddData("ItemsInFOV", &m_ItemsInFOV);
+	m_pBlackboard->AddData("EnemiesInFOV", &m_EnemiesInFOV);
+
+	// Inventory
+	m_DesiredInventoryCounts.maxGuns = 2;
+	m_DesiredInventoryCounts.maxMedkits = 2;
+	m_DesiredInventoryCounts.maxFood = 1;
+
+	m_pBlackboard->AddData("Inventory", &m_DesiredInventoryCounts);
+	//m_pBlackboard->AddData("LastInventorySlot", unsigned int(0) ); // TODO: make a struct for this
+
 
 	m_pBehaviorTree = new BehaviorTree(m_pBlackboard,
 		new BehaviorSelector(
 			{
-				// TODO Add here
+#pragma region Looting
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(SeesItem),
+						new BehaviorAction(PickupItem),
+						new BehaviorAction(Seek)
+					}
+				),
+#pragma endregion
+#pragma region House
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(IsNewHouseDiscovered),
+						new BehaviorAction(Seek)
+					}
+				),
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(IsGoingTohouse),
+						new BehaviorAction(Seek)
+					}
+				),
+#pragma endregion
 				new BehaviorSequence(
 					{
 						new BehaviorAction(ExpandingSquareSearch),
@@ -119,14 +158,18 @@ void Plugin::Render(float dt) const
 //This function calculates the new SteeringOutput, called once per frame
 SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 {
-	auto steering = SteeringPlugin_Output();
+	// Reset Data
+	m_pBlackboard->ChangeData("IsNewHouseDiscovered", false);
+	m_ItemsInFOV.clear();
+	m_EnemiesInFOV.clear();
 
+	AssignEntitiesInFOV();
+
+	auto steering = SteeringPlugin_Output();
 
 	//Use the Interface (IAssignmentInterface) to 'interface' with the AI_Framework
 	auto agentInfo = m_pInterface->Agent_GetInfo();
 	m_pBlackboard->ChangeData("AgentInfo", agentInfo);
-
-	auto nextTargetPos = m_Target; //To start you can use the mouse position as guidance
 
 	auto vHousesInFOV = GetHousesInFOV();//uses m_pInterface->Fov_GetHouseByIndex(...)
 	auto vEntitiesInFOV = GetEntitiesInFOV(); //uses m_pInterface->Fov_GetEntityByIndex(...)
@@ -137,29 +180,24 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 	}
 
 	m_pBehaviorTree->Update(dt);
-	m_pBlackboard->GetData("Target", nextTargetPos);
-	nextTargetPos = m_pInterface->NavMesh_GetClosestPathPoint(nextTargetPos);
 
-	for (auto& e : vEntitiesInFOV)
-	{
-		if (e.Type == eEntityType::PURGEZONE)
-		{
-			PurgeZoneInfo zoneInfo;
-			m_pInterface->PurgeZone_GetInfo(e, zoneInfo);
-			std::cout << "Purge Zone in FOV:" << e.Location.x << ", "<< e.Location.y <<  " ---EntityHash: " << e.EntityHash << "---Radius: "<< zoneInfo.Radius << std::endl;
-		}
+	//for (auto& e : vEntitiesInFOV)
+	//{
+	//	if (e.Type == eEntityType::PURGEZONE)
+	//	{
+	//		PurgeZoneInfo zoneInfo;
+	//		m_pInterface->PurgeZone_GetInfo(e, zoneInfo);
+	//		std::cout << "Purge Zone in FOV:" << e.Location.x << ", "<< e.Location.y <<  " ---EntityHash: " << e.EntityHash << "---Radius: "<< zoneInfo.Radius << std::endl;
+	//	}
+	//	if (e.Type == eEntityType::ENEMY)
+	//	{
+	//		EnemyInfo enemyInfo;
+	//		m_pInterface->Enemy_GetInfo(e, enemyInfo);
+	//		std::cout << "Enemy in FOV" << std::endl;
+	//	}
+	//}
 
-		if (e.Type == eEntityType::ENEMY)
-		{
-			EnemyInfo enemyInfo;
-			m_pInterface->Enemy_GetInfo(e, enemyInfo);
-			std::cout << "Enemy in FOV" << std::endl;
-		}
-	}
-
-
-	
-
+#pragma region Demo
 	//INVENTORY USAGE DEMO
 	//********************
 
@@ -203,6 +241,7 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 	//steering.RunMode = m_CanRun; //If RunMode is True > MaxLinSpd is increased for a limited time (till your stamina runs out)
 								 //SteeringPlugin_Output is works the exact same way a SteeringBehaviour output
 								 //@End (Demo Purposes)
+#pragma endregion
 
 	m_pBlackboard->GetData("SteeringOutput", steering);
 
@@ -270,5 +309,33 @@ void Plugin::AddHouseIfNew(const HouseInfo& houseInfo)
 	if (!IsHouseInList)
 	{
 		m_DiscoveredHouses.push_back(houseInfo);
+		m_pBlackboard->ChangeData("IsNewHouseDiscovered", true);
+	}
+}
+void Plugin::AssignEntitiesInFOV()
+{
+	auto vEntitiesInFOV = GetEntitiesInFOV();
+
+	for (auto& e : vEntitiesInFOV)
+	{
+		if (e.Type == eEntityType::ITEM)
+		{
+			//ItemInfo itemInfo;
+			//m_pInterface->Item_GetInfo(e, itemInfo);
+			m_ItemsInFOV.push_back(e);
+		}
+
+		if (e.Type == eEntityType::ENEMY)
+		{
+			EnemyInfo enemyInfo;
+			m_pInterface->Enemy_GetInfo(e, enemyInfo);
+			m_EnemiesInFOV.push_back(enemyInfo);
+		}
+
+		//if (e.Type == eEntityType::PURGEZONE)
+		//{
+		//	PurgeZoneInfo zoneInfo;
+		//	m_pInterface->PurgeZone_GetInfo(e, zoneInfo);
+		//}
 	}
 }

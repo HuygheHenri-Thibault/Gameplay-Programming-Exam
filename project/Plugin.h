@@ -47,7 +47,13 @@ private:
 	BehaviorTree* m_pBehaviorTree = nullptr;
 	std::vector<HouseInfo> m_DiscoveredHouses = {}; // might make a struct which has a time since last visited & have list of that instead
 
+	std::list<EntityInfo> m_ItemsInFOV = {};
+	std::list<EnemyInfo> m_EnemiesInFOV = {};
+	
+	Inventory m_DesiredInventoryCounts{};
+
 	void AddHouseIfNew(const HouseInfo& houseInfo);
+	void AssignEntitiesInFOV();
 };
 
 //ENTRY

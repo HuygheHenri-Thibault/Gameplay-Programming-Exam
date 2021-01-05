@@ -18,3 +18,13 @@ struct ExpandingSearchData
 	// Direction lastDirection = Direction::up
 };
 
+struct Inventory
+{
+	unsigned int maxGuns = 0;
+	unsigned int maxMedkits = 0;
+	unsigned int maxFood = 0;
+
+	unsigned int currentGuns = 0;
+	unsigned int currentMedkits = 0;
+	unsigned int currentFood = 0;
+};
