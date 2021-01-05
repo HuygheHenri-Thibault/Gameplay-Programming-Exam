@@ -9,25 +9,32 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 	//This interface gives you access to certain actions the AI_Framework can perform for you
 	m_pInterface = static_cast<IExamInterface*>(pInterface);
 
-	//Bit information about the plugin
-	//Please fill this in!!
 	info.BotName = "BestBot";
 	info.Student_FirstName = "Henri-Thibault";
 	info.Student_LastName = "Huyghe";
 	info.Student_Class = "2DAE01";
 
-
 	m_pBlackboard = new Blackboard();
+	m_pBlackboard->AddData("SteeringOutput", SteeringPlugin_Output{});
+	m_pBlackboard->AddData("IsRunning", false);
 	m_pBlackboard->AddData("Target", Elite::Vector2{0,0});
+	m_pBlackboard->AddData("PluginInterface", m_pInterface);
 	m_pBlackboard->AddData("WorldInfo", m_pInterface->World_GetInfo());
 	m_pBlackboard->AddData("AgentInfo", m_pInterface->Agent_GetInfo());
 	m_pBlackboard->AddData("ExpandingSquareSearchData", ExpandingSearchData{ 20.f, 0, {0,0} });
+	m_pBlackboard->AddData("DiscoveredHouses", &m_DiscoveredHouses);
+	m_pBlackboard->AddData("IsNewHouseDiscovered", false);
 
 	m_pBehaviorTree = new BehaviorTree(m_pBlackboard,
 		new BehaviorSelector(
 			{
 				// TODO Add here
-				new BehaviorAction(ExpandingSquareSearch)
+				new BehaviorSequence(
+					{
+						new BehaviorAction(ExpandingSquareSearch),
+						new BehaviorAction(Seek)
+					}
+				)
 			}
 		)
 	);
@@ -124,6 +131,10 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 	auto vHousesInFOV = GetHousesInFOV();//uses m_pInterface->Fov_GetHouseByIndex(...)
 	auto vEntitiesInFOV = GetEntitiesInFOV(); //uses m_pInterface->Fov_GetEntityByIndex(...)
 
+	for (auto& houseInFOV : vHousesInFOV)
+	{
+		AddHouseIfNew(houseInFOV);
+	}
 
 	m_pBehaviorTree->Update(dt);
 	m_pBlackboard->GetData("Target", nextTargetPos);
@@ -145,6 +156,8 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 			std::cout << "Enemy in FOV" << std::endl;
 		}
 	}
+
+
 	
 
 	//INVENTORY USAGE DEMO
@@ -177,25 +190,24 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 		m_pInterface->Inventory_RemoveItem(0);
 	}
 
-	//Simple Seek Behaviour (towards Target)
-	steering.LinearVelocity = nextTargetPos - agentInfo.Position; //Desired Velocity
-	steering.LinearVelocity.Normalize(); //Normalize Desired Velocity
-	steering.LinearVelocity *= agentInfo.MaxLinearSpeed; //Rescale to Max Speed
-
-	if (Distance(nextTargetPos, agentInfo.Position) < 2.f)
-	{
-		steering.LinearVelocity = Elite::ZeroVector2;
-	}
-
-	//steering.AngularVelocity = m_AngSpeed; //Rotate your character to inspect the world while walking
-	steering.AutoOrient = true; //Setting AutoOrientate to TRue overrides the AngularVelocity
-
-	steering.RunMode = m_CanRun; //If RunMode is True > MaxLinSpd is increased for a limited time (till your stamina runs out)
-
+	////Simple Seek Behaviour (towards Target)
+	//steering.LinearVelocity = nextTargetPos - agentInfo.Position; //Desired Velocity
+	//steering.LinearVelocity.Normalize(); //Normalize Desired Velocity
+	//steering.LinearVelocity *= agentInfo.MaxLinearSpeed; //Rescale to Max Speed
+	//if (Distance(nextTargetPos, agentInfo.Position) < 2.f)
+	//{
+	//	steering.LinearVelocity = Elite::ZeroVector2;
+	//}
+	////steering.AngularVelocity = m_AngSpeed; //Rotate your character to inspect the world while walking
+	//steering.AutoOrient = true; //Setting AutoOrientate to TRue overrides the AngularVelocity
+	//steering.RunMode = m_CanRun; //If RunMode is True > MaxLinSpd is increased for a limited time (till your stamina runs out)
 								 //SteeringPlugin_Output is works the exact same way a SteeringBehaviour output
-
 								 //@End (Demo Purposes)
-	m_GrabItem = false; //Reset State
+
+	m_pBlackboard->GetData("SteeringOutput", steering);
+
+	//Reset State
+	m_GrabItem = false; 
 	m_UseItem = false;
 	m_RemoveItem = false;
 
@@ -240,3 +252,23 @@ vector<EntityInfo> Plugin::GetEntitiesInFOV() const
 	return vEntitiesInFOV;
 }
 
+
+void Plugin::AddHouseIfNew(const HouseInfo& houseInfo)
+{
+	const float distanceMargin = 0.001f;
+	bool IsHouseInList = false;
+	
+	for (const HouseInfo& houseInList : m_DiscoveredHouses)
+	{
+		if (houseInList.Center == houseInfo.Center && houseInList.Size == houseInfo.Size)
+		{
+			IsHouseInList = true;
+			break;
+		}
+	}
+
+	if (!IsHouseInList)
+	{
+		m_DiscoveredHouses.push_back(houseInfo);
+	}
+}

@@ -64,6 +64,38 @@ BehaviorState ExpandingSquareSearch(Elite::Blackboard* pBlackboard)
 	return Success;
 }
 
+
+// MOVEMENT
+BehaviorState Seek(Elite::Blackboard* pBlackboard)
+{
+	Vector2 targetPos{};
+	AgentInfo agentInfo{};
+	SteeringPlugin_Output output{};
+	bool canRun = false;
+
+	bool dataAvailable = pBlackboard->GetData("Target", targetPos)
+		&& pBlackboard->GetData("AgentInfo", agentInfo)
+		&& pBlackboard->GetData("IsRunning", canRun);
+
+	if (!dataAvailable)
+	{
+		return Failure;
+	}
+
+	output.RunMode = canRun;
+	output.LinearVelocity = targetPos - agentInfo.Position;
+	output.LinearVelocity.Normalize();
+	output.LinearVelocity *= agentInfo.MaxLinearSpeed;
+
+	if (Distance(targetPos, agentInfo.Position) < 2.f)
+	{
+		output.LinearVelocity = Elite::ZeroVector2;
+	}
+
+	pBlackboard->ChangeData("SteeringOutput", output);
+	return Success;
+}
+
 //BehaviorState ChangeToWander(Elite::Blackboard* pBlackboard)
 //{
 //	AgarioAgent* pAgent = nullptr;

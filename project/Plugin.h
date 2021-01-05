@@ -45,6 +45,9 @@ private:
 	// Own Additions
 	Blackboard* m_pBlackboard = nullptr;
 	BehaviorTree* m_pBehaviorTree = nullptr;
+	std::vector<HouseInfo> m_DiscoveredHouses = {}; // might make a struct which has a time since last visited & have list of that instead
+
+	void AddHouseIfNew(const HouseInfo& houseInfo);
 };
 
 //ENTRY
