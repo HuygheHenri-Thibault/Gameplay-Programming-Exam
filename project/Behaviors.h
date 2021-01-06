@@ -16,7 +16,35 @@ using namespace Elite;
 //-----------------------------------------------------------------
 // Behaviors
 //-----------------------------------------------------------------
+bool IsNotDoneExploring(Elite::Blackboard* pBlackboard)
+{
+	return !IsDoneExploring(pBlackboard);
+}
+bool IsDoneExploring(Elite::Blackboard* pBlackboard)
+{
+	WorldInfo worldInfo{};
+	ExpandingSearchData searchData{};
 
+	pBlackboard->GetData("WorldInfo", worldInfo);
+	pBlackboard->GetData("ExpandingSquareSearchData", searchData);
+
+	const float halfWidth = worldInfo.Dimensions.x / 2;
+	const float halfHeight = worldInfo.Dimensions.y / 2;
+
+	if (searchData.lastSearchPosition.x < worldInfo.Center.x - halfWidth
+		|| worldInfo.Center.x + halfWidth < searchData.lastSearchPosition.x)
+	{
+		return true;
+	}
+
+	if (searchData.lastSearchPosition.y < worldInfo.Center.y - halfHeight
+		|| worldInfo.Center.y + halfHeight < searchData.lastSearchPosition.y)
+	{
+		return true;
+	}
+
+	return false;
+}
 BehaviorState ExpandingSquareSearch(Elite::Blackboard* pBlackboard)
 {	
 	const float squaredSearchDistanceMargin = 5.0f;
@@ -128,7 +156,7 @@ BehaviorState PickupItem(Elite::Blackboard* pBlackboard)
 
 	EntityInfo itemToGrab{};
 
-	for (EntityInfo item : *itemsInFov)
+	for (EntityInfo& item : *itemsInFov) // TODO: move this to own conditional?
 	{
 		ItemInfo itemInfo;
 		pluginInterface->Item_GetInfo(item, itemInfo);
@@ -183,6 +211,8 @@ BehaviorState PickupItem(Elite::Blackboard* pBlackboard)
 			}
 
 			pluginInterface->Inventory_AddItem(indexOffset + index, item);
+			inventory->inventorySlots[indexOffset + index] = item;
+
 			switch (item.Type)
 			{
 			case eItemType::PISTOL:
@@ -203,6 +233,190 @@ BehaviorState PickupItem(Elite::Blackboard* pBlackboard)
 
 	return Failure;
 }
+
+bool IsHurt(Elite::Blackboard* pBlackboard)
+{
+	const float maxHealth = 10.f; // hardcoded cause no var for it
+	AgentInfo agentInfo{};
+
+	pBlackboard->GetData("AgentInfo", agentInfo);
+
+	return (maxHealth - agentInfo.Health) > 0.0001f;
+}
+bool ShouldUseMedkit(Elite::Blackboard* pBlackboard)
+{
+	const float maxHealth = 10.f;
+	AgentInfo agentInfo{};
+	Inventory* inventory = nullptr;
+	IExamInterface* pluginInterface = nullptr;
+
+	pBlackboard->GetData("AgentInfo", agentInfo);
+	pBlackboard->GetData("Inventory", inventory);
+	pBlackboard->GetData("PluginInterface", pluginInterface);
+
+	if (inventory->currentMedkits != 0)
+	{
+		const float damageTaken = maxHealth - agentInfo.Health;
+
+		for (unsigned int i = inventory->maxGuns; i < (inventory->maxGuns + inventory->maxMedkits); i++)
+		{
+			if (inventory->inventorySlots[i].ItemHash != 0)
+			{
+				const int healthRestored = pluginInterface->Medkit_GetHealth(inventory->inventorySlots[i]);
+				if (healthRestored < damageTaken)
+				{
+					pBlackboard->ChangeData("MedkitToUse", int(i));
+					return true;
+				}
+			}
+		}
+		pBlackboard->ChangeData("MedkitToUse", -1);
+		return false;
+	}
+	else
+	{
+		pBlackboard->ChangeData("MedkitToUse", -1);
+		return false;
+	}
+}
+BehaviorState UseMedkit(Elite::Blackboard* pBlackboard)
+{
+	int indexOfMedkitToUse = 0;
+	Inventory* inventory = nullptr;
+	IExamInterface* pluginInterface = nullptr;
+
+	pBlackboard->GetData("MedkitToUse", indexOfMedkitToUse);
+	pBlackboard->GetData("Inventory", inventory);
+	pBlackboard->GetData("PluginInterface", pluginInterface);
+
+	if (unsigned int(indexOfMedkitToUse) < inventory->maxGuns 
+		|| unsigned int(indexOfMedkitToUse) >= inventory->maxGuns + inventory->maxMedkits 
+		|| inventory->inventorySlots[indexOfMedkitToUse].ItemHash == 0)
+	{
+		// if index isn't a medkit index or if the item at the index doesn't exist
+		return Failure;
+	}
+
+	pluginInterface->Inventory_UseItem(indexOfMedkitToUse);
+	pluginInterface->Inventory_RemoveItem(indexOfMedkitToUse);
+	inventory->inventorySlots[indexOfMedkitToUse] = ItemInfo{};
+	inventory->currentMedkits--;
+	pBlackboard->ChangeData("MedkitToUse", -1);
+
+	return Success;
+}
+
+bool IsHungry(Elite::Blackboard* pBlackboard)
+{
+	const float maxEnergy = 10.f;
+	AgentInfo agentInfo{};
+
+	pBlackboard->GetData("AgentInfo", agentInfo);
+
+	return (maxEnergy - agentInfo.Energy) > 0.0001f;
+}
+bool ShouldEat(Elite::Blackboard* pBlackboard)
+{
+	const float maxEnergy = 10.f;
+	const unsigned int foodIndex = 4;
+	AgentInfo agentInfo{};
+	Inventory* inventory = nullptr;
+	IExamInterface* pluginInterface = nullptr;
+
+	pBlackboard->GetData("AgentInfo", agentInfo);
+	pBlackboard->GetData("Inventory", inventory);
+	pBlackboard->GetData("PluginInterface", pluginInterface);
+
+	if (inventory->currentFood != 0)
+	{
+		const float energyNeed = maxEnergy - agentInfo.Energy;
+
+		if (inventory->inventorySlots[foodIndex].ItemHash != 0)
+		{
+			const int energyRestored = pluginInterface->Food_GetEnergy(inventory->inventorySlots[foodIndex]);
+			if (energyRestored < energyNeed)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+	else
+	{
+		return false;
+	}
+}
+BehaviorState UseFood(Elite::Blackboard* pBlackboard)
+{
+	int indexOfFoodToUse = 4;
+	Inventory* inventory = nullptr;
+	IExamInterface* pluginInterface = nullptr;
+
+	pBlackboard->GetData("Inventory", inventory);
+	pBlackboard->GetData("PluginInterface", pluginInterface);
+
+	if (inventory->inventorySlots[indexOfFoodToUse].ItemHash == 0)
+	{
+		return Failure;
+	}
+
+	pluginInterface->Inventory_UseItem(indexOfFoodToUse);
+	pluginInterface->Inventory_RemoveItem(indexOfFoodToUse);
+	inventory->inventorySlots[indexOfFoodToUse] = ItemInfo{};
+	inventory->currentFood--;
+
+	return Success;
+}
+
+bool SeesPurgeZone(Elite::Blackboard* pBlackboard)
+{
+	std::list<PurgeZoneInfo>* purgeZoneInFOV = nullptr;
+	pBlackboard->GetData("PurgeZonesInFOV", purgeZoneInFOV);
+
+	return purgeZoneInFOV->size() > 0;
+}
+bool IsInPurgeZone(Elite::Blackboard* pBlackboard)
+{
+	std::list<PurgeZoneInfo>* purgeZoneInFOV = nullptr;
+	PurgeZoneInfo* dangerousPurgeZone = nullptr;
+	AgentInfo agentInfo{};
+
+	pBlackboard->GetData("PurgeZonesInFOV", purgeZoneInFOV);
+	pBlackboard->GetData("DangerousPurgeZone", dangerousPurgeZone);
+	pBlackboard->GetData("AgentInfo", agentInfo);
+
+	bool isInsidePurgeZone = false;
+
+	for (PurgeZoneInfo& purgeZone : (*purgeZoneInFOV))
+	{
+		if (DistanceSquared(purgeZone.Center, agentInfo.Position) < exp2f(purgeZone.Radius))
+		{
+			dangerousPurgeZone = &purgeZone;
+			isInsidePurgeZone = true;
+		}
+	}
+
+	return isInsidePurgeZone;
+}
+BehaviorState LeavePurgeZone(Elite::Blackboard* pBlackboard)
+{
+	AgentInfo agentInfo{};
+	PurgeZoneInfo* dangerousPurgeZone = nullptr;
+	pBlackboard->GetData("DangerousPurgeZone", dangerousPurgeZone);
+	pBlackboard->GetData("AgentInfo", agentInfo);
+
+	if (!dangerousPurgeZone)
+	{
+		dangerousPurgeZone = nullptr;
+		return Failure;
+	}
+
+	pBlackboard->ChangeData("Target", dangerousPurgeZone->Center);
+	Flee(pBlackboard);
+
+	return Success;
+}
+
 
 // MOVEMENT
 BehaviorState Seek(Elite::Blackboard* pBlackboard)
@@ -237,6 +451,17 @@ BehaviorState Seek(Elite::Blackboard* pBlackboard)
 
 	pBlackboard->ChangeData("SteeringOutput", output);
 	return Success;
+}
+BehaviorState Flee(Elite::Blackboard* pBlackboard)
+{
+	Seek(pBlackboard);
+
+	SteeringPlugin_Output output{};
+	pBlackboard->GetData("SteeringOutput", output);
+
+	output.LinearVelocity *= -1;
+
+	pBlackboard->ChangeData("SteeringOutput", output);
 }
 
 //BehaviorState ChangeToWander(Elite::Blackboard* pBlackboard)

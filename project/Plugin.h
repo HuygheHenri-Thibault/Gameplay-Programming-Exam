@@ -49,6 +49,8 @@ private:
 
 	std::list<EntityInfo> m_ItemsInFOV = {};
 	std::list<EnemyInfo> m_EnemiesInFOV = {};
+	std::list<PurgeZoneInfo> m_PurgeZoneInFOV = {};
+	PurgeZoneInfo m_DangerousPurgeZone = {};
 	
 	Inventory m_DesiredInventoryCounts{};
 

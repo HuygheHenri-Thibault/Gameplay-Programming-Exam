@@ -32,19 +32,49 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 	// Entities
 	m_pBlackboard->AddData("ItemsInFOV", &m_ItemsInFOV);
 	m_pBlackboard->AddData("EnemiesInFOV", &m_EnemiesInFOV);
+	m_pBlackboard->AddData("PurgeZonesInFOV", &m_PurgeZoneInFOV);
+	m_pBlackboard->AddData("DangerousPurgeZone", &m_DangerousPurgeZone);
 
 	// Inventory
 	m_DesiredInventoryCounts.maxGuns = 2;
 	m_DesiredInventoryCounts.maxMedkits = 2;
 	m_DesiredInventoryCounts.maxFood = 1;
+	m_DesiredInventoryCounts.inventorySlots.resize(m_pInterface->Inventory_GetCapacity());
 
 	m_pBlackboard->AddData("Inventory", &m_DesiredInventoryCounts);
-	//m_pBlackboard->AddData("LastInventorySlot", unsigned int(0) ); // TODO: make a struct for this
-
+	m_pBlackboard->AddData("MedkitToUse", -1);
+	m_pBlackboard->AddData("GunToUse", -1);
 
 	m_pBehaviorTree = new BehaviorTree(m_pBlackboard,
 		new BehaviorSelector(
 			{
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(IsHurt),
+						new BehaviorConditional(ShouldUseMedkit),
+						new BehaviorAction(UseMedkit)
+					}
+				),
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(IsHungry),
+						new BehaviorConditional(ShouldEat),
+						new BehaviorAction(UseFood)
+					}
+				),
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(IsInPurgeZone),
+						new BehaviorAction(LeavePurgeZone),
+					}
+				),
+
+
+				// killing zombies
+
+				// running zombies if needed
+					// toggle run and let other behaviours choose where to run to I guess?
+				
 #pragma region Looting
 				new BehaviorSequence(
 					{
@@ -70,10 +100,12 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 #pragma endregion
 				new BehaviorSequence(
 					{
+						new BehaviorConditional(IsNotDoneExploring),
 						new BehaviorAction(ExpandingSquareSearch),
 						new BehaviorAction(Seek)
 					}
 				)
+			// going from house to house once there is nothing to explore anymore
 			}
 		)
 	);
@@ -162,6 +194,7 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 	m_pBlackboard->ChangeData("IsNewHouseDiscovered", false);
 	m_ItemsInFOV.clear();
 	m_EnemiesInFOV.clear();
+	m_PurgeZoneInFOV.clear();
 
 	AssignEntitiesInFOV();
 
@@ -332,10 +365,11 @@ void Plugin::AssignEntitiesInFOV()
 			m_EnemiesInFOV.push_back(enemyInfo);
 		}
 
-		//if (e.Type == eEntityType::PURGEZONE)
-		//{
-		//	PurgeZoneInfo zoneInfo;
-		//	m_pInterface->PurgeZone_GetInfo(e, zoneInfo);
-		//}
+		if (e.Type == eEntityType::PURGEZONE)
+		{
+			PurgeZoneInfo zoneInfo;
+			m_pInterface->PurgeZone_GetInfo(e, zoneInfo);
+			m_PurgeZoneInFOV.push_back(zoneInfo);
+		}
 	}
 }

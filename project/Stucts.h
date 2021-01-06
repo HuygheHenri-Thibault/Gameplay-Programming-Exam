@@ -27,4 +27,6 @@ struct Inventory
 	unsigned int currentGuns = 0;
 	unsigned int currentMedkits = 0;
 	unsigned int currentFood = 0;
+
+	std::vector<ItemInfo> inventorySlots = {};
 };
