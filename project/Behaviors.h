@@ -16,10 +16,132 @@ using namespace Elite;
 //-----------------------------------------------------------------
 // Behaviors
 //-----------------------------------------------------------------
-bool IsNotDoneExploring(Elite::Blackboard* pBlackboard)
+
+// MOVEMENT
+BehaviorState Seek(Elite::Blackboard* pBlackboard)
 {
-	return !IsDoneExploring(pBlackboard);
+	Vector2 targetPos{};
+	AgentInfo agentInfo{};
+	SteeringPlugin_Output output{};
+	bool canRun = false;
+	IExamInterface* pluginInterface = nullptr;
+
+	bool dataAvailable = pBlackboard->GetData("Target", targetPos)
+		&& pBlackboard->GetData("AgentInfo", agentInfo)
+		&& pBlackboard->GetData("IsRunning", canRun)
+		&& pBlackboard->GetData("PluginInterface", pluginInterface);
+
+	if (!dataAvailable)
+	{
+		return Failure;
+	}
+
+	targetPos = pluginInterface->NavMesh_GetClosestPathPoint(targetPos);
+
+	output.RunMode = canRun;
+	output.LinearVelocity = targetPos - agentInfo.Position;
+	output.LinearVelocity.Normalize();
+	output.LinearVelocity *= agentInfo.MaxLinearSpeed;
+
+	if (DistanceSquared(targetPos, agentInfo.Position) < exp2f(2.f))
+	{
+		output.LinearVelocity = Elite::ZeroVector2;
+	}
+
+	pBlackboard->ChangeData("SteeringOutput", output);
+	return Success;
 }
+BehaviorState Flee(Elite::Blackboard* pBlackboard)
+{
+	Seek(pBlackboard);
+
+	SteeringPlugin_Output output{};
+	pBlackboard->GetData("SteeringOutput", output);
+
+	output.LinearVelocity *= -1;
+
+	pBlackboard->ChangeData("SteeringOutput", output);
+	return Success;
+}
+BehaviorState Face(Elite::Blackboard* pBlackboard)
+{
+	Vector2 target{};
+	AgentInfo agentInfo{};
+	pBlackboard->GetData("Target", target);
+	pBlackboard->GetData("AgentInfo", agentInfo);
+
+	SteeringPlugin_Output output{};
+
+	const Vector2 toTarget{ target - agentInfo.Position };
+
+	const float angleTo{ atan2f(toTarget.y, toTarget.x) + float(E_PI_2) };
+	float angleFrom{ agentInfo.Orientation };
+	
+	angleFrom = atan2f(sinf(angleFrom), cosf(angleFrom)); // makes angle between 0 & 360deg
+
+	float deltaAngle = angleTo - angleFrom;
+
+	constexpr float Pi2 = float(E_PI) * 2.f;
+	if (deltaAngle > E_PI)
+		deltaAngle -= Pi2;
+	else if (deltaAngle < -E_PI)
+		deltaAngle += Pi2;
+
+	// multiply desired by some value to make it go as fast as possible (30.f)
+	output.AngularVelocity = deltaAngle * 50.f;
+
+	output.AutoOrient = false;
+
+	pBlackboard->ChangeData("SteeringOutput", output);
+	return Success;
+}
+BehaviorState StrafeAndTurn(Elite::Blackboard* pBlackboard)
+{
+	StrafeInfo strafeInfo{};
+	AgentInfo agentInfo{};
+	pBlackboard->GetData("StrafeInfo", strafeInfo);
+	pBlackboard->GetData("AgentInfo", agentInfo);
+
+	if (!strafeInfo.isStrafing)
+	{
+		strafeInfo.startOrientation = agentInfo.Orientation;
+		strafeInfo.endOrientation = agentInfo.Orientation + float(E_PI); // +180deg
+		strafeInfo.startLinearVelocity = agentInfo.LinearVelocity;
+		strafeInfo.isStrafing = true;
+	}
+	else
+	{
+		if (AreEqual(agentInfo.Orientation, strafeInfo.endOrientation, 0.01f))
+		{
+			strafeInfo.isStrafing = false;
+			pBlackboard->ChangeData("StrafeInfo", strafeInfo);
+			return Success;
+		}
+	}
+
+	// seek in the direction we were going
+	Vector2 seekTarget = agentInfo.Position + (strafeInfo.startLinearVelocity * 5);
+	pBlackboard->ChangeData("Target", seekTarget);
+	Seek(pBlackboard);
+
+	SteeringPlugin_Output seekOutput{};
+	pBlackboard->GetData("SteeringOutput", seekOutput);
+
+	// get point to face to
+	Vector2 faceTarget = agentInfo.Position + Elite::OrientationToVector(strafeInfo.endOrientation);
+	pBlackboard->ChangeData("Target", faceTarget);
+	Face(pBlackboard);
+
+	SteeringPlugin_Output output{};
+	pBlackboard->GetData("SteeringOutput", output);
+	
+	output.LinearVelocity = seekOutput.LinearVelocity;
+	pBlackboard->ChangeData("SteeringOutput", output);
+	return Success;
+}
+
+// Decision making & Actions
+
 bool IsDoneExploring(Elite::Blackboard* pBlackboard)
 {
 	WorldInfo worldInfo{};
@@ -417,98 +539,130 @@ BehaviorState LeavePurgeZone(Elite::Blackboard* pBlackboard)
 	return Success;
 }
 
-
-// MOVEMENT
-BehaviorState Seek(Elite::Blackboard* pBlackboard)
+bool IsZombieInFOV(Elite::Blackboard* pBlackboard)
 {
-	Vector2 targetPos{};
+	std::list<EnemyInfo>* enemiesInFOV = nullptr;
+	pBlackboard->GetData("EnemiesInFOV", enemiesInFOV);
+
+	return enemiesInFOV->size() > 0;
+}
+bool IsArmed(Elite::Blackboard* pBlackboard)
+{
+	Inventory* inventory = nullptr;
+	pBlackboard->GetData("Inventory", inventory);
+
+	return inventory->currentGuns > 0;
+}
+bool IsFacingEnemy(Elite::Blackboard* pBlackboard)
+{
+	std::list<EnemyInfo>* enemiesInFOV = nullptr;
 	AgentInfo agentInfo{};
-	SteeringPlugin_Output output{};
-	bool canRun = false;
-	IExamInterface* pluginInterface = nullptr;
+	SteeringPlugin_Output lastSteering{};
 
-	bool dataAvailable = pBlackboard->GetData("Target", targetPos)
-		&& pBlackboard->GetData("AgentInfo", agentInfo)
-		&& pBlackboard->GetData("IsRunning", canRun)
-		&& pBlackboard->GetData("PluginInterface", pluginInterface);
+	pBlackboard->GetData("EnemiesInFOV", enemiesInFOV);
+	pBlackboard->GetData("AgentInfo", agentInfo);
+	pBlackboard->GetData("SteeringOutput", lastSteering);
 
-	if (!dataAvailable)
+	if (enemiesInFOV->size() == 0)
 	{
 		return Failure;
 	}
 
-	targetPos = pluginInterface->NavMesh_GetClosestPathPoint(targetPos);
+	EnemyInfo& targetEnemy = enemiesInFOV->front();
 
-	output.RunMode = canRun;
-	output.LinearVelocity = targetPos - agentInfo.Position;
-	output.LinearVelocity.Normalize();
-	output.LinearVelocity *= agentInfo.MaxLinearSpeed;
+	Vector2 toTargetNormal = (targetEnemy.Location - agentInfo.Position).GetNormalized();
+	Vector2 heading = OrientationToVector(agentInfo.Orientation);
 
-	if (Distance(targetPos, agentInfo.Position) < 2.f)
+	const float dotResult = heading.Dot(toTargetNormal);
+
+	const float longDistanceSquared = (agentInfo.FOV_Range / 3) * 2;
+	if (DistanceSquared(agentInfo.Position, targetEnemy.Location) > longDistanceSquared)
 	{
-		output.LinearVelocity = Elite::ZeroVector2;
+		return abs(dotResult - 1.f) < 0.005f; // long range needs a narrower margin, at close range this causes jittering
 	}
 
-	pBlackboard->ChangeData("SteeringOutput", output);
+	return abs(dotResult - 1.f) < 0.008f;
+}
+bool IsBitten(Elite::Blackboard* pBlackboard)
+{
+	AgentInfo agentInfo{};
+
+	pBlackboard->GetData("AgentInfo", agentInfo);
+
+	return agentInfo.Bitten;
+}
+bool WasBitten(Elite::Blackboard* pBlackboard)
+{
+	AgentInfo agentInfo{};
+
+	pBlackboard->GetData("AgentInfo", agentInfo);
+
+	return agentInfo.WasBitten;
+}
+bool IsStrafing(Elite::Blackboard* pBlackboard)
+{
+	StrafeInfo strafeInfo{};
+	pBlackboard->GetData("StrafeInfo", strafeInfo);
+	
+	return strafeInfo.isStrafing;
+}
+BehaviorState Shoot(Elite::Blackboard* pBlackboard)
+{
+	IExamInterface* pluginInterface = nullptr;
+	AgentInfo agentInfo{};
+	Inventory* inventory = nullptr;
+	pBlackboard->GetData("PluginInterface", pluginInterface);
+	pBlackboard->GetData("AgentInfo", agentInfo);
+	pBlackboard->GetData("Inventory", inventory);
+
+	if (inventory->currentGuns == 0)
+	{
+		return Failure;
+	}
+
+	unsigned int lowestAmmo = 100;
+	int indexOfWeaponWithLeastAmmo = -1;
+	for (unsigned int i = 0; i < inventory->maxGuns; i++)
+	{
+		ItemInfo& itemAtIndex = inventory->inventorySlots[i];
+
+		if (itemAtIndex.ItemHash != 0)
+		{
+			unsigned int weaponAmmo = pluginInterface->Weapon_GetAmmo(itemAtIndex);
+			if (weaponAmmo < lowestAmmo)
+			{
+				lowestAmmo = weaponAmmo;
+				indexOfWeaponWithLeastAmmo = i;
+			}
+		}
+	}
+
+	ItemInfo& weaponToUse = inventory->inventorySlots[indexOfWeaponWithLeastAmmo];
+	pluginInterface->Inventory_UseItem(indexOfWeaponWithLeastAmmo);
+	if (pluginInterface->Weapon_GetAmmo(weaponToUse) == 0)
+	{
+		pluginInterface->Inventory_RemoveItem(indexOfWeaponWithLeastAmmo);
+		inventory->inventorySlots[indexOfWeaponWithLeastAmmo] = ItemInfo{};
+		inventory->currentGuns--;
+	}
 	return Success;
 }
-BehaviorState Flee(Elite::Blackboard* pBlackboard)
+BehaviorState SetEnemyAsTarget(Elite::Blackboard* pBlackboard)
 {
-	Seek(pBlackboard);
+	std::list<EnemyInfo>* enemiesInFOV = nullptr;
 
-	SteeringPlugin_Output output{};
-	pBlackboard->GetData("SteeringOutput", output);
+	pBlackboard->GetData("EnemiesInFOV", enemiesInFOV);
 
-	output.LinearVelocity *= -1;
+	if (enemiesInFOV->size() <= 0)
+	{
+		return Failure;
+	}
 
-	pBlackboard->ChangeData("SteeringOutput", output);
+	EnemyInfo& targetEnemy = enemiesInFOV->front();
+
+	pBlackboard->ChangeData("Target", targetEnemy.Location);
+	return Success;
 }
 
-//BehaviorState ChangeToWander(Elite::Blackboard* pBlackboard)
-//{
-//	AgarioAgent* pAgent = nullptr;
-//	auto dataAvailable = pBlackboard->GetData("Agent", pAgent);
-//
-//	if (!pAgent)
-//		return Failure;
-//
-//	pAgent->SetToWander();
-//
-//	return Success;
-//}
-//
-//BehaviorState ChangeToSeek(Elite::Blackboard* pBlackboard)
-//{
-//	AgarioAgent* pAgent = nullptr;
-//	Vector2 seekTarget{};
-//	auto dataAvailable = pBlackboard->GetData("Agent", pAgent) && 
-//		pBlackboard->GetData("Target", seekTarget);
-//
-//
-//	if (!pAgent || !dataAvailable)
-//		return Failure;
-//	
-//	pAgent->SetToSeek(seekTarget);
-//
-//	return Success;
-//}
-//
-//BehaviorState ChangeToFlee(Elite::Blackboard* pBlackboard)
-//{
-//	AgarioAgent* pAgent = nullptr;
-//	Vector2 fleeTarget{};
-//	auto dataAvailable = pBlackboard->GetData("Agent", pAgent) &&
-//		pBlackboard->GetData("FleeTarget", fleeTarget);
-//
-//
-//	if (!pAgent || !dataAvailable)
-//		return Failure;
-//
-//	fleeTarget = pAgent->GetPosition() + ( (fleeTarget - pAgent->GetPosition()) * -1);
-//
-//	pAgent->SetToSeek(fleeTarget);
-//
-//	return Success;
-//}
 
 #endif

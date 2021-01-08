@@ -30,3 +30,11 @@ struct Inventory
 
 	std::vector<ItemInfo> inventorySlots = {};
 };
+
+struct StrafeInfo 
+{
+	float startOrientation = 0.f;
+	float endOrientation = 0.f;
+	Elite::Vector2 startLinearVelocity = {0.f,0.f};
+	bool isStrafing = false;
+};

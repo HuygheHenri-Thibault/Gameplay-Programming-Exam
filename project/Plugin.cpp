@@ -17,6 +17,7 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 	m_pBlackboard = new Blackboard();
 	m_pBlackboard->AddData("SteeringOutput", SteeringPlugin_Output{});
 	m_pBlackboard->AddData("IsRunning", false);
+	m_pBlackboard->AddData("StrafeInfo", StrafeInfo{});
 	m_pBlackboard->AddData("Target", Elite::Vector2{0,0});
 	m_pBlackboard->AddData("PluginInterface", m_pInterface);
 	m_pBlackboard->AddData("WorldInfo", m_pInterface->World_GetInfo());
@@ -48,6 +49,7 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 	m_pBehaviorTree = new BehaviorTree(m_pBlackboard,
 		new BehaviorSelector(
 			{
+#pragma region Item Use
 				new BehaviorSequence(
 					{
 						new BehaviorConditional(IsHurt),
@@ -62,15 +64,66 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 						new BehaviorAction(UseFood)
 					}
 				),
+#pragma endregion
 				new BehaviorSequence(
 					{
 						new BehaviorConditional(IsInPurgeZone),
 						new BehaviorAction(LeavePurgeZone),
 					}
 				),
+#pragma region Zombie Killing
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(IsZombieInFOV),
+						new BehaviorSelector(
+							{
+								new BehaviorSequence(
+									{
+										new BehaviorConditional(IsArmed),
+										new BehaviorSelector(
+											{
+												new BehaviorSequence(
+													{
+														new BehaviorConditional(IsFacingEnemy),
+														new BehaviorAction(Shoot)
+													}
+												),
+												new BehaviorSequence(
+													{
+														new BehaviorInvertedConditional(IsFacingEnemy),
+														new BehaviorAction(SetEnemyAsTarget),
+														new BehaviorAction(Face)
+													}
+												)
+											}
+										)
+									}
+								)
+							}
+						),
+						
+					}
+				),
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(IsBitten),
+						new BehaviorInvertedConditional(IsZombieInFOV),
+						new BehaviorConditional(IsArmed),
+						new BehaviorAction(StrafeAndTurn)
+					}
+				),
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(WasBitten),
+						new BehaviorConditional(IsStrafing),
+						new BehaviorAction(StrafeAndTurn)
+					}
+				),
 
-
-				// killing zombies
+			// have I been bitten?
+				// is there any enemy in my fov?
+					// if not, turn around 180deg
+#pragma endregion
 
 				// running zombies if needed
 					// toggle run and let other behaviours choose where to run to I guess?
@@ -100,7 +153,7 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 #pragma endregion
 				new BehaviorSequence(
 					{
-						new BehaviorConditional(IsNotDoneExploring),
+						new BehaviorInvertedConditional(IsDoneExploring),
 						new BehaviorAction(ExpandingSquareSearch),
 						new BehaviorAction(Seek)
 					}
@@ -129,7 +182,7 @@ void Plugin::InitGameDebugParams(GameDebugParams& params)
 {
 	params.AutoFollowCam = true; //Automatically follow the AI? (Default = true)
 	params.RenderUI = true; //Render the IMGUI Panel? (Default = true)
-	params.SpawnEnemies = false; //Do you want to spawn enemies? (Default = true)
+	params.SpawnEnemies = true; //Do you want to spawn enemies? (Default = true)
 	params.EnemyCount = 20; //How many enemies? (Default = 20)
 	params.GodMode = false; //GodMode > You can't die, can be usefull to inspect certain behaviours (Default = false)
 	params.AutoGrabClosestItem = true; //A call to Item_Grab(...) returns the closest item that can be grabbed. (EntityInfo argument is ignored)
@@ -146,7 +199,7 @@ void Plugin::Update(float dt)
 		//Update target based on input
 		Elite::MouseData mouseData = m_pInterface->Input_GetMouseData(Elite::InputType::eMouseButton, Elite::InputMouseButton::eLeft);
 		const Elite::Vector2 pos = Elite::Vector2(static_cast<float>(mouseData.X), static_cast<float>(mouseData.Y));
-		m_Target = m_pInterface->Debug_ConvertScreenToWorld(pos);
+		target = m_pInterface->Debug_ConvertScreenToWorld(pos);
 	}
 	else if (m_pInterface->Input_IsKeyboardKeyDown(Elite::eScancode_Space))
 	{
@@ -182,7 +235,7 @@ void Plugin::Update(float dt)
 void Plugin::Render(float dt) const
 {
 	//This Render function should only contain calls to Interface->Draw_... functions
-	m_pInterface->Draw_SolidCircle(m_Target, .7f, { 0,0 }, { 1, 0, 0 });
+	m_pInterface->Draw_SolidCircle(target, .7f, { 0,0 }, { 1, 0, 0 });
 }
 #pragma endregion
 

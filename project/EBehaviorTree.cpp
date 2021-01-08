@@ -72,6 +72,23 @@ BehaviorState BehaviorPartialSequence::Execute(Blackboard* pBlackBoard)
 }
 #pragma endregion
 //-----------------------------------------------------------------
+// BEHAVIOR TREE INVERTED CONDITIONAL (IBehavior)
+//-----------------------------------------------------------------
+BehaviorState BehaviorInvertedConditional::Execute(Blackboard* pBlackBoard)
+{
+	if (m_fpConditional == nullptr)
+		return Failure;
+
+	switch (m_fpConditional(pBlackBoard))
+	{
+	case false:
+		return m_CurrentState = Success;
+	case true:
+		return m_CurrentState = Failure;
+	}
+	return m_CurrentState = Failure;
+}
+//-----------------------------------------------------------------
 // BEHAVIOR TREE CONDITIONAL (IBehavior)
 //-----------------------------------------------------------------
 BehaviorState BehaviorConditional::Execute(Blackboard* pBlackBoard)

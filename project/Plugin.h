@@ -34,7 +34,7 @@ private:
 	vector<HouseInfo> GetHousesInFOV() const;
 	vector<EntityInfo> GetEntitiesInFOV() const;
 
-	Elite::Vector2 m_Target = {};
+	Elite::Vector2 target = {};
 	bool m_CanRun = false; //Demo purpose
 	bool m_GrabItem = false; //Demo purpose
 	bool m_UseItem = false; //Demo purpose

@@ -98,6 +98,19 @@ namespace Elite
 #pragma endregion
 
 	//-----------------------------------------------------------------
+	// BEHAVIOR TREE CONDITIONAL INVERTOR (IBehavior)
+	//-----------------------------------------------------------------
+	class BehaviorInvertedConditional : public IBehavior
+	{
+	public:
+		explicit BehaviorInvertedConditional(std::function<bool(Blackboard*)> fp) : m_fpConditional(fp) {}
+		virtual BehaviorState Execute(Blackboard* pBlackBoard) override;
+
+	private:
+		std::function<bool(Blackboard*)> m_fpConditional = nullptr;
+	};
+
+	//-----------------------------------------------------------------
 	// BEHAVIOR TREE CONDITIONAL (IBehavior)
 	//-----------------------------------------------------------------
 	class BehaviorConditional : public IBehavior
