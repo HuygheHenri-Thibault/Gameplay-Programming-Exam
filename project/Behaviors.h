@@ -184,6 +184,11 @@ BehaviorState ExpandingSquareSearch(Elite::Blackboard* pBlackboard)
 		return Failure;
 	}
 
+	if (WasBitten(pBlackboard))
+	{
+		pBlackboard->ChangeData("IsRunning", true);
+	}
+
 	if (DistanceSquared(searchData.lastSearchPosition, agentInfo.Position) < squaredSearchDistanceMargin)
 	{
 		float distanceToTravel = searchData.distance * (1 + searchData.step / 2);
