@@ -142,87 +142,6 @@ BehaviorState StrafeAndTurn(Elite::Blackboard* pBlackboard)
 }
 
 // Decision making & Actions
-
-bool IsDoneExploring(Elite::Blackboard* pBlackboard)
-{
-	WorldInfo worldInfo{};
-	ExpandingSearchData searchData{};
-
-	pBlackboard->GetData("WorldInfo", worldInfo);
-	pBlackboard->GetData("ExpandingSquareSearchData", searchData);
-
-	const float halfWidth = worldInfo.Dimensions.x / 2;
-	const float halfHeight = worldInfo.Dimensions.y / 2;
-
-	if (searchData.lastSearchPosition.x < worldInfo.Center.x - halfWidth
-		|| worldInfo.Center.x + halfWidth < searchData.lastSearchPosition.x)
-	{
-		return true;
-	}
-
-	if (searchData.lastSearchPosition.y < worldInfo.Center.y - halfHeight
-		|| worldInfo.Center.y + halfHeight < searchData.lastSearchPosition.y)
-	{
-		return true;
-	}
-
-	return false;
-}
-BehaviorState ExpandingSquareSearch(Elite::Blackboard* pBlackboard)
-{	
-	const float squaredSearchDistanceMargin = 5.0f;
-	ExpandingSearchData searchData;
-	AgentInfo agentInfo;
-	IExamInterface* pluginInterface = nullptr;
-
-	bool dataAvailable = pBlackboard->GetData("ExpandingSquareSearchData", searchData)
-		&& pBlackboard->GetData("AgentInfo", agentInfo)
-		&& pBlackboard->GetData("PluginInterface", pluginInterface);
-
-	if (!dataAvailable)
-	{
-		return Failure;
-	}
-
-	if (WasBitten(pBlackboard))
-	{
-		pBlackboard->ChangeData("IsRunning", true);
-	}
-
-	if (DistanceSquared(searchData.lastSearchPosition, agentInfo.Position) < squaredSearchDistanceMargin)
-	{
-		float distanceToTravel = searchData.distance * (1 + searchData.step / 2);
-		Elite::Vector2 newTarget = searchData.lastSearchPosition;
-
-		switch (searchData.step % 4)
-		{
-		case 0:
-			// go left
-			newTarget.x -= distanceToTravel;
-			break;
-		case 1:
-			// go up
-			newTarget.y += distanceToTravel;
-			break;
-		case 2:
-			// go right
-			newTarget.x += distanceToTravel;
-			break;
-		case 3:
-			// go down
-			newTarget.y -= distanceToTravel;
-			break;
-		}
-
-		searchData.lastSearchPosition = newTarget;
-		searchData.step++;
-		pBlackboard->ChangeData("ExpandingSquareSearchData", searchData);
-	}
-
-	pBlackboard->ChangeData("Target", pluginInterface->NavMesh_GetClosestPathPoint(searchData.lastSearchPosition));
-	return Success;
-}
-
 bool IsNewHouseDiscovered(Elite::Blackboard* pBlackboard)
 {
 	bool isNewHouseFound = false;
@@ -678,6 +597,86 @@ BehaviorState SetEnemyAsTarget(Elite::Blackboard* pBlackboard)
 	EnemyInfo& targetEnemy = enemiesInFOV->front();
 
 	pBlackboard->ChangeData("Target", targetEnemy.Location);
+	return Success;
+}
+
+bool IsDoneExploring(Elite::Blackboard* pBlackboard)
+{
+	WorldInfo worldInfo{};
+	ExpandingSearchData searchData{};
+
+	pBlackboard->GetData("WorldInfo", worldInfo);
+	pBlackboard->GetData("ExpandingSquareSearchData", searchData);
+
+	const float halfWidth = worldInfo.Dimensions.x / 2;
+	const float halfHeight = worldInfo.Dimensions.y / 2;
+
+	if (searchData.lastSearchPosition.x < worldInfo.Center.x - halfWidth
+		|| worldInfo.Center.x + halfWidth < searchData.lastSearchPosition.x)
+	{
+		return true;
+	}
+
+	if (searchData.lastSearchPosition.y < worldInfo.Center.y - halfHeight
+		|| worldInfo.Center.y + halfHeight < searchData.lastSearchPosition.y)
+	{
+		return true;
+	}
+
+	return false;
+}
+BehaviorState ExpandingSquareSearch(Elite::Blackboard* pBlackboard)
+{
+	const float squaredSearchDistanceMargin = 5.0f;
+	ExpandingSearchData searchData;
+	AgentInfo agentInfo;
+	IExamInterface* pluginInterface = nullptr;
+
+	bool dataAvailable = pBlackboard->GetData("ExpandingSquareSearchData", searchData)
+		&& pBlackboard->GetData("AgentInfo", agentInfo)
+		&& pBlackboard->GetData("PluginInterface", pluginInterface);
+
+	if (!dataAvailable)
+	{
+		return Failure;
+	}
+
+	if (WasBitten(pBlackboard))
+	{
+		pBlackboard->ChangeData("IsRunning", true);
+	}
+
+	if (DistanceSquared(searchData.lastSearchPosition, agentInfo.Position) < squaredSearchDistanceMargin)
+	{
+		float distanceToTravel = searchData.distance * (1 + searchData.step / 2);
+		Elite::Vector2 newTarget = searchData.lastSearchPosition;
+
+		switch (searchData.step % 4)
+		{
+		case 0:
+			// go left
+			newTarget.x -= distanceToTravel;
+			break;
+		case 1:
+			// go up
+			newTarget.y += distanceToTravel;
+			break;
+		case 2:
+			// go right
+			newTarget.x += distanceToTravel;
+			break;
+		case 3:
+			// go down
+			newTarget.y -= distanceToTravel;
+			break;
+		}
+
+		searchData.lastSearchPosition = newTarget;
+		searchData.step++;
+		pBlackboard->ChangeData("ExpandingSquareSearchData", searchData);
+	}
+
+	pBlackboard->ChangeData("Target", pluginInterface->NavMesh_GetClosestPathPoint(searchData.lastSearchPosition));
 	return Success;
 }
 
