@@ -108,6 +108,7 @@ BehaviorState StrafeAndTurn(Elite::Blackboard* pBlackboard)
 		strafeInfo.endOrientation = agentInfo.Orientation + float(E_PI); // +180deg
 		strafeInfo.startLinearVelocity = agentInfo.LinearVelocity;
 		strafeInfo.isStrafing = true;
+		pBlackboard->ChangeData("StrafeInfo", strafeInfo);
 	}
 	else
 	{
@@ -575,7 +576,7 @@ bool IsFacingEnemy(Elite::Blackboard* pBlackboard)
 
 	const float dotResult = heading.Dot(toTargetNormal);
 
-	const float longDistanceSquared = (agentInfo.FOV_Range / 3) * 2;
+	const float longDistanceSquared = exp2f((agentInfo.FOV_Range / 3) * 2);
 	if (DistanceSquared(agentInfo.Position, targetEnemy.Location) > longDistanceSquared)
 	{
 		return abs(dotResult - 1.f) < 0.005f; // long range needs a narrower margin, at close range this causes jittering
@@ -620,6 +621,12 @@ BehaviorState Shoot(Elite::Blackboard* pBlackboard)
 		return Failure;
 	}
 
+	if (IsStrafing(pBlackboard))
+	{
+		StrafeInfo strafeInfo{};
+		pBlackboard->ChangeData("StrafeInfo", strafeInfo);
+	}
+
 	unsigned int lowestAmmo = 100;
 	int indexOfWeaponWithLeastAmmo = -1;
 	for (unsigned int i = 0; i < inventory->maxGuns; i++)
@@ -635,6 +642,11 @@ BehaviorState Shoot(Elite::Blackboard* pBlackboard)
 				indexOfWeaponWithLeastAmmo = i;
 			}
 		}
+	}
+
+	if (indexOfWeaponWithLeastAmmo < 0)
+	{
+		return Failure;
 	}
 
 	ItemInfo& weaponToUse = inventory->inventorySlots[indexOfWeaponWithLeastAmmo];

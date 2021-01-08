@@ -106,23 +106,19 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 				),
 				new BehaviorSequence(
 					{
-						new BehaviorConditional(IsBitten),
-						new BehaviorInvertedConditional(IsZombieInFOV),
-						new BehaviorConditional(IsArmed),
+						new BehaviorConditional(IsStrafing),
 						new BehaviorAction(StrafeAndTurn)
 					}
 				),
 				new BehaviorSequence(
 					{
 						new BehaviorConditional(WasBitten),
-						new BehaviorConditional(IsStrafing),
+						new BehaviorInvertedConditional(IsZombieInFOV),
+						new BehaviorConditional(IsArmed),
 						new BehaviorAction(StrafeAndTurn)
 					}
 				),
 
-			// have I been bitten?
-				// is there any enemy in my fov?
-					// if not, turn around 180deg
 #pragma endregion
 
 				// running zombies if needed
