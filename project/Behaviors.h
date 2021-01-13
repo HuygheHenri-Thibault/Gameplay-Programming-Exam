@@ -263,19 +263,7 @@ BehaviorState PickupItem(Elite::Blackboard* pBlackboard)
 #pragma region Delete Item from memory and fetch
 			// Remove item from memory & reset fetch
 			pBlackboard->ChangeData("ItemBeingFetched", ItemInfo{});
-
-			std::vector<ItemInfo>* pItemMemory = nullptr;
-			pBlackboard->GetData("ItemMemory", pItemMemory);
-
-			for (ItemInfo& itemInMemory : (*pItemMemory))
-			{
-				if (itemInMemory.Location == item.Location)
-				{
-					itemInMemory = (*pItemMemory)[(*pItemMemory).size() - 1];
-					pItemMemory->pop_back();
-					break;
-				}
-			}
+			RemoveItemFromMemory(item, pBlackboard);
 #pragma endregion
 
 			switch (item.Type)
@@ -358,22 +346,12 @@ BehaviorState DestroyGarbageInRange(Elite::Blackboard* pBlackboard)
 	{
 		if (e.Location == garbageItem.Location)
 		{
+			ItemInfo item{};
+			pInterface->Item_GetInfo(e, item);
+			RemoveItemFromMemory(item, pBlackboard);
+
 			pInterface->Item_Destroy(e);
 			pBlackboard->ChangeData("GarbageSeen", ItemInfo{});
-
-			std::vector<ItemInfo>* pItemMemory = nullptr;
-			pBlackboard->GetData("ItemMemory", pItemMemory);
-
-			for (ItemInfo& itemInMemory : (*pItemMemory))
-			{
-				if (itemInMemory.Location == e.Location)
-				{
-					itemInMemory = (*pItemMemory)[(*pItemMemory).size() - 1];
-					pItemMemory->pop_back();
-					break;
-				}
-			}
-
 			return Success;
 		}
 	}
@@ -893,5 +871,22 @@ BehaviorState SetHouseAsTarget(Elite::Blackboard* pBlackboard)
 	pBlackboard->ChangeData("Target", (*pDiscoveredHouses)[lastHouseIndex].Center);
 
 	return Success;
+}
+
+// Helpers //
+void RemoveItemFromMemory(const ItemInfo& item, Elite::Blackboard* pBlackboard)
+{
+	std::vector<ItemInfo>* pItemMemory = nullptr;
+	pBlackboard->GetData("ItemMemory", pItemMemory);
+
+	for (ItemInfo& itemInMemory : (*pItemMemory))
+	{
+		if (itemInMemory.Location == item.Location)
+		{
+			itemInMemory = (*pItemMemory)[(*pItemMemory).size() - 1];
+			pItemMemory->pop_back();
+			break;
+		}
+	}
 }
 #endif
