@@ -17,6 +17,23 @@ using namespace Elite;
 // Behaviors
 //-----------------------------------------------------------------
 
+// Helpers //
+void RemoveItemFromMemory(const ItemInfo& item, Elite::Blackboard* pBlackboard)
+{
+	std::vector<ItemInfo>* pItemMemory = nullptr;
+	pBlackboard->GetData("ItemMemory", pItemMemory);
+
+	for (ItemInfo& itemInMemory : (*pItemMemory))
+	{
+		if (itemInMemory.Location == item.Location)
+		{
+			itemInMemory = (*pItemMemory)[(*pItemMemory).size() - 1];
+			pItemMemory->pop_back();
+			break;
+		}
+	}
+}
+
 // MOVEMENT
 BehaviorState Seek(Elite::Blackboard* pBlackboard)
 {
@@ -873,20 +890,5 @@ BehaviorState SetHouseAsTarget(Elite::Blackboard* pBlackboard)
 	return Success;
 }
 
-// Helpers //
-void RemoveItemFromMemory(const ItemInfo& item, Elite::Blackboard* pBlackboard)
-{
-	std::vector<ItemInfo>* pItemMemory = nullptr;
-	pBlackboard->GetData("ItemMemory", pItemMemory);
 
-	for (ItemInfo& itemInMemory : (*pItemMemory))
-	{
-		if (itemInMemory.Location == item.Location)
-		{
-			itemInMemory = (*pItemMemory)[(*pItemMemory).size() - 1];
-			pItemMemory->pop_back();
-			break;
-		}
-	}
-}
 #endif
