@@ -60,10 +60,10 @@ BehaviorState Seek(Elite::Blackboard* pBlackboard)
 	output.LinearVelocity.Normalize();
 	output.LinearVelocity *= agentInfo.MaxLinearSpeed;
 
-	if (DistanceSquared(targetPos, agentInfo.Position) < exp2f(2.f))
-	{
-		output.LinearVelocity = Elite::ZeroVector2;
-	}
+	//if (DistanceSquared(targetPos, agentInfo.Position) < exp2f(2.f))
+	//{
+	//	output.LinearVelocity = Elite::ZeroVector2;
+	//}
 
 	pBlackboard->ChangeData("SteeringOutput", output);
 	return Success;
@@ -159,6 +159,12 @@ BehaviorState StrafeAndTurn(Elite::Blackboard* pBlackboard)
 }
 
 // Decision making & Actions
+BehaviorState ToggleRun(Elite::Blackboard* pBlackboard)
+{
+	pBlackboard->ChangeData("IsRunning", true);
+	return Success;
+}
+
 bool IsNewHouseDiscovered(Elite::Blackboard* pBlackboard)
 {
 	bool isNewHouseFound = false;

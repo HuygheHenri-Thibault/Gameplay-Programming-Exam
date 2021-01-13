@@ -123,6 +123,14 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 						new BehaviorAction(StrafeAndTurn)
 					}
 				),
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(WasBitten),
+						new BehaviorInvertedConditional(IsArmed),
+						new BehaviorAction(ToggleRun),
+						new BehaviorAction(Flee)
+					}
+				),
 
 #pragma endregion				
 #pragma region Looting
@@ -179,6 +187,7 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 					}
 				),
 #pragma endregion
+#pragma region Exploration
 				new BehaviorSequence(
 					{
 						new BehaviorInvertedConditional(IsDoneExploring),
@@ -192,7 +201,7 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 						new BehaviorAction(Seek)
 					}
 				)
-			// going from house to house once there is nothing to explore anymore
+#pragma endregion
 			}
 		)
 	);
