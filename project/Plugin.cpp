@@ -268,7 +268,9 @@ void Plugin::Update(float dt)
 //This function should only be used for rendering debug elements
 void Plugin::Render(float dt) const
 {
-	m_pInterface->Draw_SolidCircle(target, .7f, { 0,0 }, { 1, 0, 0 });
+	Vector2 targetPos{};
+	m_pBlackboard->GetData("Target", targetPos);
+	m_pInterface->Draw_SolidCircle(targetPos, .7f, { 0,0 }, { 1, 0, 0 });
 	
 	AgentInfo agentInfo{};
 	float maxFetchRange{};
@@ -413,7 +415,7 @@ void Plugin::AddNewItemsToMemory()
 		bool isItemInMemory = false;
 		for(ItemInfo& itemInMemory : m_ItemMemory)
 		{
-			if (itemInMemory.ItemHash == item.ItemHash)
+			if (itemInMemory.Location == item.Location)
 			{
 				isItemInMemory = true;
 			}

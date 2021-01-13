@@ -269,9 +269,9 @@ BehaviorState PickupItem(Elite::Blackboard* pBlackboard)
 
 			for (ItemInfo& itemInMemory : (*pItemMemory))
 			{
-				if (itemInMemory.ItemHash == item.ItemHash)
+				if (itemInMemory.Location == item.Location)
 				{
-					itemInMemory = (*pItemMemory)[(*pItemMemory).size()];
+					itemInMemory = (*pItemMemory)[(*pItemMemory).size() - 1];
 					pItemMemory->pop_back();
 					break;
 				}
@@ -356,10 +356,24 @@ BehaviorState DestroyGarbageInRange(Elite::Blackboard* pBlackboard)
 
 	for (EntityInfo& e : (*itemsInFov))
 	{
-		if (e.EntityHash == garbageItem.ItemHash)
+		if (e.Location == garbageItem.Location)
 		{
 			pInterface->Item_Destroy(e);
 			pBlackboard->ChangeData("GarbageSeen", ItemInfo{});
+
+			std::vector<ItemInfo>* pItemMemory = nullptr;
+			pBlackboard->GetData("ItemMemory", pItemMemory);
+
+			for (ItemInfo& itemInMemory : (*pItemMemory))
+			{
+				if (itemInMemory.Location == e.Location)
+				{
+					itemInMemory = (*pItemMemory)[(*pItemMemory).size() - 1];
+					pItemMemory->pop_back();
+					break;
+				}
+			}
+
 			return Success;
 		}
 	}
@@ -393,7 +407,7 @@ bool IsInNeedOfItem(Elite::Blackboard* pBlackboard)
 bool IsANeededItemClose(Elite::Blackboard* pBlackboard)
 {
 	Inventory* inventory = nullptr;
-	list<ItemInfo>* pItemMemory = nullptr;
+	std::vector<ItemInfo>* pItemMemory = nullptr;
 	float itemFetchMaxRange = 0;
 	AgentInfo agentInfo{};
 
@@ -402,7 +416,7 @@ bool IsANeededItemClose(Elite::Blackboard* pBlackboard)
 	pBlackboard->GetData("ItemFetchMaxRange", itemFetchMaxRange);
 	pBlackboard->GetData("AgentInfo", agentInfo);
 
-	const float sqrMaxRange = exp2f(sqrMaxRange);
+	const float sqrMaxRange = exp2f(itemFetchMaxRange);
 
 	bool inNeedOfPistol = inventory->currentGuns < inventory->maxGuns;
 	bool inNeedOfMedkit = inventory->currentMedkits < inventory->maxMedkits;
