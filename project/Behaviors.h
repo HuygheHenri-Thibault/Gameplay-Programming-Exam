@@ -280,6 +280,86 @@ BehaviorState PickupItem(Elite::Blackboard* pBlackboard)
 
 	return Failure;
 }
+bool SeesGarbage(Elite::Blackboard* pBlackboard)
+{
+	std::list<EntityInfo>* itemsInFov = nullptr;
+	IExamInterface* pInterface = nullptr;
+
+	pBlackboard->GetData("ItemsInFOV", itemsInFov);
+	pBlackboard->GetData("PluginInterface", pInterface);
+
+	for (EntityInfo& e : (*itemsInFov))
+	{
+		ItemInfo item{};
+		pInterface->Item_GetInfo(e, item);
+		if (item.Type == eItemType::GARBAGE)
+		{
+			pBlackboard->ChangeData("GarbageSeen", item);
+			return true;
+		}
+	}
+	return false;
+}
+bool GarbageIsInGrabRange(Elite::Blackboard* pBlackboard)
+{
+	ItemInfo garbageItem{};
+	AgentInfo agentInfo{};
+	pBlackboard->GetData("GarbageSeen", garbageItem);
+	pBlackboard->GetData("AgentInfo", agentInfo);
+	
+
+	if (garbageItem.ItemHash != 0)
+	{
+		const float sqrGrabRange = exp2f(agentInfo.GrabRange);
+		if (DistanceSquared(agentInfo.Position, garbageItem.Location) < sqrGrabRange)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+BehaviorState DestroyGarbageInRange(Elite::Blackboard* pBlackboard)
+{
+	ItemInfo garbageItem{};
+	AgentInfo agentInfo{};
+	IExamInterface* pInterface = nullptr;
+	std::list<EntityInfo>* itemsInFov = nullptr;
+
+	pBlackboard->GetData("GarbageSeen", garbageItem);
+	pBlackboard->GetData("AgentInfo", agentInfo);
+	pBlackboard->GetData("PluginInterface", pInterface);
+	pBlackboard->GetData("ItemsInFOV", itemsInFov);
+
+	if (garbageItem.ItemHash == 0)
+	{
+		return Failure;
+	}
+
+
+	for (EntityInfo& e : (*itemsInFov))
+	{
+		if (e.EntityHash == garbageItem.ItemHash)
+		{
+			pInterface->Item_Destroy(e);
+			pBlackboard->ChangeData("GarbageSeen", ItemInfo{});
+			return Success;
+		}
+	}
+	return Failure;
+}
+BehaviorState SetGarbageAsTarget(Elite::Blackboard* pBlackboard)
+{
+	ItemInfo garbageItem{};
+	pBlackboard->GetData("GarbageSeen", garbageItem);
+
+	if (garbageItem.ItemHash == 0)
+	{
+		return Failure;
+	}
+
+	pBlackboard->ChangeData("Target", garbageItem.Location);
+	return Success;
+}
 
 bool IsHurt(Elite::Blackboard* pBlackboard)
 {

@@ -45,6 +45,7 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 	m_pBlackboard->AddData("Inventory", &m_DesiredInventoryCounts);
 	m_pBlackboard->AddData("MedkitToUse", -1);
 	m_pBlackboard->AddData("GunToUse", -1);
+	m_pBlackboard->AddData("GarbageSeen", ItemInfo{});
 
 	m_pBehaviorTree = new BehaviorTree(m_pBlackboard,
 		new BehaviorSelector(
@@ -132,17 +133,44 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 						new BehaviorAction(Seek)
 					}
 				),
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(SeesGarbage),
+						new BehaviorSelector(
+							{
+								new BehaviorSequence(
+									{
+										new BehaviorConditional(GarbageIsInGrabRange),
+										new BehaviorAction(DestroyGarbageInRange)
+									}
+								),
+								new BehaviorSequence(
+									{
+										new BehaviorInvertedConditional(GarbageIsInGrabRange),
+										new BehaviorAction(SetGarbageAsTarget),
+										new BehaviorAction(Seek)
+									}
+								),
+							}
+						),
+						
+					}
+				),
+				// if item is close & it's needed
+					// seek to it
+				// if garbage is close 
+					// seek to it
 #pragma endregion
 #pragma region House
 				new BehaviorSequence(
 					{
-						new BehaviorConditional(IsNewHouseDiscovered),
+						new BehaviorConditional(IsGoingTohouse),
 						new BehaviorAction(Seek)
 					}
 				),
 				new BehaviorSequence(
 					{
-						new BehaviorConditional(IsGoingTohouse),
+						new BehaviorConditional(IsNewHouseDiscovered),
 						new BehaviorAction(Seek)
 					}
 				),

@@ -395,8 +395,10 @@ MigrationBackup/
 # End of https://www.toptal.com/developers/gitignore/api/visualstudio,c++
 
 
-# Own additions
+# Own additions (These dont wirj fir some reason :/)
 _DEMO_DEBUG/*
 _DEMO_RELEASE/*
 _DEMO_DEBUG/imgui.ini
+_DEMO_DEBUG/GPP_Plugin_d.exp
+../inc/*
 _DEMO_DEBUG/GPP_Plugin_d.exp
