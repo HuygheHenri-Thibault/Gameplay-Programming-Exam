@@ -260,6 +260,24 @@ BehaviorState PickupItem(Elite::Blackboard* pBlackboard)
 			pluginInterface->Inventory_AddItem(indexOffset + index, item);
 			inventory->inventorySlots[indexOffset + index] = item;
 
+#pragma region Delete Item from memory and fetch
+			// Remove item from memory & reset fetch
+			pBlackboard->ChangeData("ItemBeingFetched", ItemInfo{});
+
+			std::vector<ItemInfo>* pItemMemory = nullptr;
+			pBlackboard->GetData("ItemMemory", pItemMemory);
+
+			for (ItemInfo& itemInMemory : (*pItemMemory))
+			{
+				if (itemInMemory.ItemHash == item.ItemHash)
+				{
+					itemInMemory = (*pItemMemory)[(*pItemMemory).size()];
+					pItemMemory->pop_back();
+					break;
+				}
+			}
+#pragma endregion
+
 			switch (item.Type)
 			{
 			case eItemType::PISTOL:
@@ -358,6 +376,82 @@ BehaviorState SetGarbageAsTarget(Elite::Blackboard* pBlackboard)
 	}
 
 	pBlackboard->ChangeData("Target", garbageItem.Location);
+	return Success;
+}
+
+bool IsInNeedOfItem(Elite::Blackboard* pBlackboard)
+{
+	Inventory* inventory = nullptr;
+	pBlackboard->GetData("Inventory", inventory);
+
+	bool inNeedOfPistol = inventory->currentGuns < inventory->maxGuns;
+	bool inNeedOfMedkit = inventory->currentMedkits < inventory->maxMedkits;
+	bool inNeedOfFood = inventory->currentFood < inventory->maxFood;
+
+	return inNeedOfPistol || inNeedOfMedkit || inNeedOfFood;
+}
+bool IsANeededItemClose(Elite::Blackboard* pBlackboard)
+{
+	Inventory* inventory = nullptr;
+	list<ItemInfo>* pItemMemory = nullptr;
+	float itemFetchMaxRange = 0;
+	AgentInfo agentInfo{};
+
+	pBlackboard->GetData("Inventory", inventory);
+	pBlackboard->GetData("ItemMemory", pItemMemory);
+	pBlackboard->GetData("ItemFetchMaxRange", itemFetchMaxRange);
+	pBlackboard->GetData("AgentInfo", agentInfo);
+
+	const float sqrMaxRange = exp2f(sqrMaxRange);
+
+	bool inNeedOfPistol = inventory->currentGuns < inventory->maxGuns;
+	bool inNeedOfMedkit = inventory->currentMedkits < inventory->maxMedkits;
+	bool inNeedOfFood = inventory->currentFood < inventory->maxFood;
+
+	ItemInfo itemInRange{};
+
+	for (ItemInfo& item : (*pItemMemory))
+	{
+		if (DistanceSquared(item.Location, agentInfo.Position) > sqrMaxRange)
+		{
+			continue;
+		}
+
+		if (inNeedOfPistol && item.Type == eItemType::PISTOL)
+		{
+			itemInRange = item;
+			break;
+		}
+		else if (inNeedOfMedkit && item.Type == eItemType::MEDKIT)
+		{
+			itemInRange = item;
+			break;
+		}
+		else if (inNeedOfFood && item.Type == eItemType::FOOD)
+		{
+			itemInRange = item;
+			break;
+		}
+	}
+
+	if (itemInRange.ItemHash != 0)
+	{
+		pBlackboard->ChangeData("ItemBeingFetched", itemInRange);
+		return true;
+	}
+	return false;
+}
+BehaviorState SetNeededItemAsTarget(Elite::Blackboard* pBlackboard)
+{
+	ItemInfo neededItem{};
+	pBlackboard->GetData("ItemBeingFetched", neededItem);
+
+	if (neededItem.ItemHash == 0)
+	{
+		return Failure;
+	}
+
+	pBlackboard->ChangeData("Target", neededItem.Location);
 	return Success;
 }
 
@@ -539,6 +633,7 @@ BehaviorState LeavePurgeZone(Elite::Blackboard* pBlackboard)
 	}
 
 	pBlackboard->ChangeData("Target", dangerousPurgeZone->Center);
+	pBlackboard->ChangeData("IsRunning", true);
 	Flee(pBlackboard);
 
 	return Success;
@@ -760,5 +855,29 @@ BehaviorState ExpandingSquareSearch(Elite::Blackboard* pBlackboard)
 	return Success;
 }
 
+BehaviorState SetHouseAsTarget(Elite::Blackboard* pBlackboard)
+{
+	std::vector<HouseInfo>* pDiscoveredHouses = nullptr;
+	int lastHouseIndex = 0;
+	AgentInfo agentInfo{};
+	pBlackboard->GetData("DiscoveredHouses", pDiscoveredHouses);
+	pBlackboard->GetData("LastHouseTargetIndex", lastHouseIndex);
+	pBlackboard->GetData("AgentInfo", agentInfo);
 
+	const bool isCloseEnough = DistanceSquared((*pDiscoveredHouses)[lastHouseIndex].Center, agentInfo.Position) < 10.f;
+
+	if (isCloseEnough)
+	{
+		lastHouseIndex++;
+		if (lastHouseIndex == (*pDiscoveredHouses).size())
+		{
+			lastHouseIndex = 0;
+		}
+		pBlackboard->ChangeData("LastHouseTargetIndex", lastHouseIndex);
+	}
+
+	pBlackboard->ChangeData("Target", (*pDiscoveredHouses)[lastHouseIndex].Center);
+
+	return Success;
+}
 #endif

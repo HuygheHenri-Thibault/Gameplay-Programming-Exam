@@ -53,9 +53,11 @@ private:
 	PurgeZoneInfo m_DangerousPurgeZone = {};
 	
 	Inventory m_DesiredInventoryCounts{};
+	std::vector<ItemInfo> m_ItemMemory{};
 
 	void AddHouseIfNew(const HouseInfo& houseInfo);
 	void AssignEntitiesInFOV();
+	void AddNewItemsToMemory();
 };
 
 //ENTRY

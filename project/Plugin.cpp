@@ -26,6 +26,7 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 	// Exploring & Houses
 	m_pBlackboard->AddData("ExpandingSquareSearchData", ExpandingSearchData{ 25.f, 0, {0,0} });
 	m_pBlackboard->AddData("DiscoveredHouses", &m_DiscoveredHouses);
+	m_pBlackboard->AddData("LastHouseTargetIndex", 0);
 	m_pBlackboard->AddData("IsNewHouseDiscovered", false);
 	m_pBlackboard->AddData("IsGoingToHouse", false);
 	m_pBlackboard->AddData("HouseTarget", HouseInfo{});
@@ -46,6 +47,9 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 	m_pBlackboard->AddData("MedkitToUse", -1);
 	m_pBlackboard->AddData("GunToUse", -1);
 	m_pBlackboard->AddData("GarbageSeen", ItemInfo{});
+	m_pBlackboard->AddData("ItemMemory", &m_ItemMemory);
+	m_pBlackboard->AddData("ItemFetchMaxRange", 75.f);
+	m_pBlackboard->AddData("ItemBeingFetched", ItemInfo{});
 
 	m_pBehaviorTree = new BehaviorTree(m_pBlackboard,
 		new BehaviorSelector(
@@ -120,11 +124,7 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 					}
 				),
 
-#pragma endregion
-
-				// running zombies if needed
-					// toggle run and let other behaviours choose where to run to I guess?
-				
+#pragma endregion				
 #pragma region Looting
 				new BehaviorSequence(
 					{
@@ -156,10 +156,14 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 						
 					}
 				),
-				// if item is close & it's needed
-					// seek to it
-				// if garbage is close 
-					// seek to it
+				new BehaviorSequence(
+					{
+						new BehaviorConditional(IsInNeedOfItem),
+						new BehaviorConditional(IsANeededItemClose),
+						new BehaviorAction(SetNeededItemAsTarget),
+						new BehaviorAction(Seek)
+					}
+				),
 #pragma endregion
 #pragma region House
 				new BehaviorSequence(
@@ -179,6 +183,12 @@ void Plugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 					{
 						new BehaviorInvertedConditional(IsDoneExploring),
 						new BehaviorAction(ExpandingSquareSearch),
+						new BehaviorAction(Seek)
+					}
+				),
+				new BehaviorSequence(
+					{
+						new BehaviorAction(SetHouseAsTarget),
 						new BehaviorAction(Seek)
 					}
 				)
@@ -258,8 +268,14 @@ void Plugin::Update(float dt)
 //This function should only be used for rendering debug elements
 void Plugin::Render(float dt) const
 {
-	//This Render function should only contain calls to Interface->Draw_... functions
 	m_pInterface->Draw_SolidCircle(target, .7f, { 0,0 }, { 1, 0, 0 });
+	
+	AgentInfo agentInfo{};
+	float maxFetchRange{};
+	m_pBlackboard->GetData("AgentInfo", agentInfo);
+	m_pBlackboard->GetData("ItemFetchMaxRange", maxFetchRange);
+
+	m_pInterface->Draw_Circle(agentInfo.Position, maxFetchRange, { 1, 0, 0 });
 }
 #pragma endregion
 
@@ -269,20 +285,21 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 {
 	// Reset Data
 	m_pBlackboard->ChangeData("IsNewHouseDiscovered", false);
+	m_pBlackboard->ChangeData("IsRunning", false);
 	m_ItemsInFOV.clear();
 	m_EnemiesInFOV.clear();
 	m_PurgeZoneInFOV.clear();
 
 	AssignEntitiesInFOV();
+	AddNewItemsToMemory();
 
 	auto steering = SteeringPlugin_Output();
 
-	//Use the Interface (IAssignmentInterface) to 'interface' with the AI_Framework
 	auto agentInfo = m_pInterface->Agent_GetInfo();
 	m_pBlackboard->ChangeData("AgentInfo", agentInfo);
 
-	auto vHousesInFOV = GetHousesInFOV();//uses m_pInterface->Fov_GetHouseByIndex(...)
-	auto vEntitiesInFOV = GetEntitiesInFOV(); //uses m_pInterface->Fov_GetEntityByIndex(...)
+	auto vHousesInFOV = GetHousesInFOV();
+	auto vEntitiesInFOV = GetEntitiesInFOV();
 
 	for (auto& houseInFOV : vHousesInFOV)
 	{
@@ -290,68 +307,6 @@ SteeringPlugin_Output Plugin::UpdateSteering(float dt)
 	}
 
 	m_pBehaviorTree->Update(dt);
-
-	//for (auto& e : vEntitiesInFOV)
-	//{
-	//	if (e.Type == eEntityType::PURGEZONE)
-	//	{
-	//		PurgeZoneInfo zoneInfo;
-	//		m_pInterface->PurgeZone_GetInfo(e, zoneInfo);
-	//		std::cout << "Purge Zone in FOV:" << e.Location.x << ", "<< e.Location.y <<  " ---EntityHash: " << e.EntityHash << "---Radius: "<< zoneInfo.Radius << std::endl;
-	//	}
-	//	if (e.Type == eEntityType::ENEMY)
-	//	{
-	//		EnemyInfo enemyInfo;
-	//		m_pInterface->Enemy_GetInfo(e, enemyInfo);
-	//		std::cout << "Enemy in FOV" << std::endl;
-	//	}
-	//}
-
-#pragma region Demo
-	//INVENTORY USAGE DEMO
-	//********************
-
-	if (m_GrabItem)
-	{
-		ItemInfo item;
-		//Item_Grab > When DebugParams.AutoGrabClosestItem is TRUE, the Item_Grab function returns the closest item in range
-		//Keep in mind that DebugParams are only used for debugging purposes, by default this flag is FALSE
-		//Otherwise, use GetEntitiesInFOV() to retrieve a vector of all entities in the FOV (EntityInfo)
-		//Item_Grab gives you the ItemInfo back, based on the passed EntityHash (retrieved by GetEntitiesInFOV)
-		if (m_pInterface->Item_Grab({}, item))
-		{
-			//Once grabbed, you can add it to a specific inventory slot
-			//Slot must be empty
-			m_pInterface->Inventory_AddItem(0, item);
-		}
-	}
-
-	if (m_UseItem)
-	{
-		//Use an item (make sure there is an item at the given inventory slot)
-		m_pInterface->Inventory_UseItem(0);
-	}
-
-	if (m_RemoveItem)
-	{
-		//Remove an item from a inventory slot
-		m_pInterface->Inventory_RemoveItem(0);
-	}
-
-	////Simple Seek Behaviour (towards Target)
-	//steering.LinearVelocity = nextTargetPos - agentInfo.Position; //Desired Velocity
-	//steering.LinearVelocity.Normalize(); //Normalize Desired Velocity
-	//steering.LinearVelocity *= agentInfo.MaxLinearSpeed; //Rescale to Max Speed
-	//if (Distance(nextTargetPos, agentInfo.Position) < 2.f)
-	//{
-	//	steering.LinearVelocity = Elite::ZeroVector2;
-	//}
-	////steering.AngularVelocity = m_AngSpeed; //Rotate your character to inspect the world while walking
-	//steering.AutoOrient = true; //Setting AutoOrientate to TRue overrides the AngularVelocity
-	//steering.RunMode = m_CanRun; //If RunMode is True > MaxLinSpd is increased for a limited time (till your stamina runs out)
-								 //SteeringPlugin_Output is works the exact same way a SteeringBehaviour output
-								 //@End (Demo Purposes)
-#pragma endregion
 
 	m_pBlackboard->GetData("SteeringOutput", steering);
 
@@ -381,7 +336,6 @@ vector<HouseInfo> Plugin::GetHousesInFOV() const
 
 	return vHousesInFOV;
 }
-
 vector<EntityInfo> Plugin::GetEntitiesInFOV() const
 {
 	vector<EntityInfo> vEntitiesInFOV = {};
@@ -400,7 +354,6 @@ vector<EntityInfo> Plugin::GetEntitiesInFOV() const
 
 	return vEntitiesInFOV;
 }
-
 
 void Plugin::AddHouseIfNew(const HouseInfo& houseInfo)
 {
@@ -450,3 +403,26 @@ void Plugin::AssignEntitiesInFOV()
 		}
 	}
 }
+void Plugin::AddNewItemsToMemory()
+{
+	for (EntityInfo& e : m_ItemsInFOV)
+	{
+		ItemInfo item{};
+		m_pInterface->Item_GetInfo(e, item);
+
+		bool isItemInMemory = false;
+		for(ItemInfo& itemInMemory : m_ItemMemory)
+		{
+			if (itemInMemory.ItemHash == item.ItemHash)
+			{
+				isItemInMemory = true;
+			}
+		};
+
+		if (!isItemInMemory)
+		{
+			m_ItemMemory.push_back(item);
+		}
+	}
+}
+
