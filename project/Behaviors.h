@@ -690,13 +690,20 @@ bool IsFacingEnemy(Elite::Blackboard* pBlackboard)
 
 	const float dotResult = heading.Dot(toTargetNormal);
 
-	const float longDistanceSquared = exp2f((agentInfo.FOV_Range / 3) * 2);
-	if (DistanceSquared(agentInfo.Position, targetEnemy.Location) > longDistanceSquared)
-	{
-		return abs(dotResult - 1.f) < 0.005f; // long range needs a narrower margin, at close range this causes jittering
-	}
+	//const float longDistanceSquared = exp2f((agentInfo.FOV_Range / 3) * 2);
+	//if (DistanceSquared(agentInfo.Position, targetEnemy.Location) > longDistanceSquared)
+	//{
+	//	return abs(dotResult - 1.f) < 0.005f; // long range needs a narrower margin, at close range this causes jittering
+	//}
 
-	return abs(dotResult - 1.f) < 0.008f;
+	float accuracyMargin = 0.01f;
+	if (DistanceSquared(agentInfo.Position, targetEnemy.Location) >  exp2f(agentInfo.FOV_Range / 2))
+	{
+		accuracyMargin = 0.00001f;
+	}
+	return AreEqual(dotResult, 1.0f, accuracyMargin);
+
+	//return abs(dotResult - 1.f) < 0.008f;
 }
 bool IsBitten(Elite::Blackboard* pBlackboard)
 {
